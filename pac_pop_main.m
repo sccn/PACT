@@ -5,7 +5,9 @@
 %   >>  [ALLEEG EEG] = pac_pop_main(ALLEEG, EEG, CURRENTSET);
 
 % Author: Makoto Miyakoshi, Arnaud Delorme JSPS/SCCN,INC,UCSD
+%
 % History:
+% 09/20/2019 Makoto. eegh() supported. Thank you Brian Kavanaugh for using PACT.
 % 06/19/2014 ver 2.2 by Makoto. dropDownStrings bug fixed.
 % 01/09/2013 ver 2.1 by Makoto. isfield(EEG.event, 'type') added.
 % 12/25/2012 ver 2.0 by Makoto. MobiLab and VisEd supported. assignin used.
@@ -145,3 +147,9 @@ options = eval([ '{' options '}' ]);
 EEG = pac_man(EEG, options{:});
 EEG = pac_pop_statsSetUp(EEG);
 [ALLEEG, EEG] = eeg_store(ALLEEG, EEG, CURRENTSET);
+
+% Update eegh. (09/20/2019 updated).
+optionStrings = sprintf('''lfoPhase'', [%s], ''hfoAmp'', [%s], ''hfoTopRatio'', %d, ''hfoPool'', %d, ''whichMarker'', %d, ''windowLength'', [%d], ''alpha'', [%d], ''numSurro'', %d, ''numPhaseBin'', %d', ...
+                           num2str(options{2}), num2str(options{4}), options{6}, options{8}, options{10}, options{12}, options{14}, options{16}, options{18});
+com = sprintf('EEG = pac_man(EEG, %s)', optionStrings);
+EEG = eegh(com, EEG);
