@@ -99,7 +99,7 @@ red).](images/Demo06.jpg)
     multiplying -1 to all the data.
 
 ![thumb\|400px\|Figure 4. Manually marking HFOs. Left, using VisEd.
-Right, using customized MoBILAB plots.](Demo04.jpg)
+Right, using customized MoBILAB plots.](images/Demo04.jpg)
 
 <i><p style="text-align: center">Figure 4. Manually marking HFOs. Left, using VisEd. Right, using customized MoBILAB plots</p></i> 
 
