@@ -84,6 +84,7 @@
 % Berens (2009) circstat: A MATLAB toolbox for circular statistics. J stat softw. 31.
 
 % History:
+% 08/12/2024 Makoto. whichMarker-1 is changed to whichMarker.
 % 08/09/2024 Makoto. Fix request by Henrico. 'hfoPool', '4' is added.
 % 01/13/2021 Makoto. Checked for moving to Github.
 % 11/04/2020 Makoto. Removing 1-s data before and after data edges and boundaries to avoid filter's edge effect for window-rejected data.
@@ -324,7 +325,8 @@ switch hfoPool
 
         % Obtain the target event times.
         allEventTypes = unique({EEG.event.type});
-        selectedEvent = allEventTypes{whichMarker-1};
+        %selectedEvent = allEventTypes{whichMarker-1};
+        selectedEvent = allEventTypes{whichMarker};
         eventIdx      = find(strcmp({EEG.event.type}, selectedEvent));
         latencyIdx    = cell2mat({EEG.event(eventIdx).latency})';
         
