@@ -5,6 +5,7 @@
 
 % Author: Makoto Miyakoshi, Arnaud Delorme JSPS/SCCN,INC,UCSD
 % History
+% 08/13/2024 Makoto. Fontsize fixed (now I'm using glasses)
 % 01/31/2013 ver 1.2 by Makoto. yaxis scale adjusted.
 % 12/24/2012 ver 1.1 by Makoto. Minor change added.
 % 11/01/2012 ver 1.0 by Makoto. Created.
@@ -98,4 +99,4 @@ function myfigure(EEG, figCounter, distribTestType, mCorrectType)
     maxFigNum = ceil(EEG.nbchan/30);
     annotation(gcf,'textbox', [0 1 1 0],...
         'String', {[num2str(EEG.pac.hfoAmp(1)) '-' num2str(EEG.pac.hfoAmp(2)) ' Hz amp coupling to  ' num2str(EEG.pac.lfoPhase(1)) '-' num2str(EEG.pac.lfoPhase(2)) ' Hz phase. ' distribTestType ' Test corrected with ' mCorrectType '.  (page ' num2str(figCounter) ' of ' num2str(maxFigNum) ')']},...
-        'HorizontalAlignment','center', 'FontSize',12, 'FitBoxToText','off', 'LineStyle','none');  
+        'HorizontalAlignment','center', 'FontSize',10, 'FitBoxToText','off', 'LineStyle','none');  

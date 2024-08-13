@@ -6,6 +6,7 @@
 
 % Author: Makoto Miyakoshi, JSPS/SCCN,INC,UCSD 2012-
 % History:
+% 08/13/2024 Makoto. Color scheme changed to jet.
 % 06/20/2013 ver 2.0 by Makoto. Mean angle and Resultant Vector Length added.
 % 04/16/2013 ver 1.2 by Makoto. Confidence Interval option added.
 % 12/24/2012 ver 1.1 by Makoto. Minor change added.
@@ -71,14 +72,15 @@ hold off
 hold on
 offset = max(EEG.pac.mi)*3/100;
 sigChan = find(EEG.pac.currentMIpval < EEG.pac.alpha);
-plot(sigChan, EEG.pac.mi(sigChan,1)+offset, 'LineStyle','none', 'Marker', '*', 'MarkerSize', 8, 'Color', 'r')
+plot(sigChan, EEG.pac.mi(sigChan,1)+offset, 'LineStyle','none', 'Marker', '*', 'MarkerSize', 6, 'Color', 'r')
 hold off
 
-set(get(gca, 'XLabel'), 'String', 'Channels', 'FontSize', 18)
+set(get(gca, 'XLabel'), 'String', 'Channels', 'FontSize', 10)
 
-set(gca, 'clim', [0 360], 'FontSize', 16)
+set(gca, 'clim', [0 360], 'FontSize', 10)
 h2 = colorbar('location','northoutside');
-set(h2, 'XTick', [0 90 180 270 360],'FontSize', 16);
+colormap('jet')
+set(h2, 'XTick', [0 90 180 270 360],'FontSize', 10);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% overplot resultant vector length %%%
@@ -87,19 +89,19 @@ hold on
 [ax,h3,h4] = plotyy(1:EEG.nbchan, zeros(1,EEG.nbchan), 1:EEG.nbchan, EEG.pac.vectLength);
 set(h3, 'Color', [1 1 1], 'LineStyle', 'none')
 set(ax(1), 'YTick', 5:5:100, 'YColor', 'k', 'Box', 'off')
-set(get(gca, 'YLabel'), 'String', 'Modulation Index with CI', 'FontSize', 18)
+set(get(gca, 'YLabel'), 'String', 'Modulation Index with CI', 'FontSize', 10)
 xlim(ax(1), [0 EEG.nbchan+1])
 ylim(ax(1), [0 max(EEG.pac.mi)*1.1])
 
-set(h4, 'Color', [0 0 0.75], 'LineStyle', ':', 'LineWidth', 2, 'Marker', 'o', 'MarkerSize', 10)
-set(ax(2), 'XTick',[], 'YTick', 0.2:0.2:1, 'YColor', [0 0 0.75], 'FontSize', 16)
-set(get(ax(2), 'YLabel'), 'String', 'Resultant Vector Length', 'FontSize', 18)
+set(h4, 'Color', [0 0 0.75], 'LineStyle', ':', 'LineWidth', 1, 'Marker', 'o', 'MarkerSize', 6)
+set(ax(2), 'XTick',[], 'YTick', 0.2:0.2:1, 'YColor', [0 0 0.75], 'FontSize', 10)
+set(get(ax(2), 'YLabel'), 'String', 'Resultant Vector Length', 'FontSize', 10)
 xlim(ax(2), [0 EEG.nbchan+1])
 ylim(ax(2), [0 max(EEG.pac.vectLength)*1.1])
 
 annotation(gcf,'textbox', [0 1 1 0],...
     'String',{'Modulation Index (bar; red star, significant), Mean Angle (color-coded), and Resultant Vector Length (line).'},...
-    'HorizontalAlignment','center', 'FontSize',18, 'FitBoxToText','off', 'LineStyle','none', 'FontName','Arial');
+    'HorizontalAlignment','center', 'FontSize', 10, 'FitBoxToText','off', 'LineStyle','none', 'FontName','Arial');
 
 % display explanations in the figure name
 set(gcf, 'Name', 'pac_vis_chanMi()', 'numbertitle','off');

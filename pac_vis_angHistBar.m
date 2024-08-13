@@ -9,6 +9,7 @@
 
 % Author: Makoto Miyakoshi, Arnaud Delorme JSPS/SCCN,INC,UCSD
 % History
+% 08/13/2024 Makoto. Fontsize fixed (now I'm using glasses)
 % 06/21/2013 ver 2.0 by Makoto. SD added. Watson-Williams test added.
 % 12/24/2012 ver 1.1 by Makoto. Minor change added.
 % 11/01/2012 ver 1.0 by Makoto. Created.
@@ -115,5 +116,5 @@ function myfigure(EEG, figCounter, phaseTestType, mCorrectType)
     maxFigNum = ceil(EEG.nbchan/30);
     annotation(gcf,'textbox', [0 1 1 0],...
         'String', {[num2str(EEG.pac.hfoAmp(1)) '-' num2str(EEG.pac.hfoAmp(2)) ' Hz amp coupling to  ' num2str(EEG.pac.lfoPhase(1)) '-' num2str(EEG.pac.lfoPhase(2)) ' Hz phase. ' phaseTestType ' Test corrected with ' mCorrectType '. Red background, deveation from mean angle of all-channel mean. (page ' num2str(figCounter) ' of ' num2str(maxFigNum) ')']},...
-        'HorizontalAlignment','center', 'FontSize',16, 'FitBoxToText','off', 'LineStyle','none');   
+        'HorizontalAlignment','center', 'FontSize', 10, 'FitBoxToText','off', 'LineStyle','none');   
     
