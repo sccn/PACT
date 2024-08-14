@@ -3,6 +3,7 @@
 
 % Author: Makoto Miyakoshi, JSPS/SCCN,INC,UCSD
 % History
+% 01/13/2021 Makoto. Mobilab express removed because unable to update the interactive graphics.
 % 07/24/2019 Makoto. scanHfoByPhase added.
 % 03/28/2014 ver 1.5 by Makoto. pac_setPath added.
 % 03/27/2013 ver 1.4 by Makoto. pac_setMobilabExpress added.
@@ -30,7 +31,7 @@
 function vers = eegplugin_pac(fig, try_strings, catch_strings)
 
 % sanity check
-vers = 'pac';
+vers = 'PACT0.50';
 if nargin < 3
     error('eegplugin_pac requires 3 arguments');
 end
@@ -48,10 +49,10 @@ highLevelManu = findobj(fig, 'tag', 'tools');
 submenu       = uimenu(highLevelManu, 'label', 'PACT','separator','on');
 
 % add submenu
-uimenu( submenu, 'label', 'Invert polarity',                 'callback', 'EEG = pac_pop_invertPolarity(EEG);  [ALLEEG,EEG,CURRENTSET] = eeg_store(ALLEEG,EEG); eeglab redraw');
-uimenu( submenu, 'label', 'Convert event names to strings',  'callback', 'EEG = pac_pop_convertNumEventType2Str(EEG);  [ALLEEG,EEG,CURRENTSET] = eeg_store(ALLEEG,EEG); eeglab redraw');
-uimenu( submenu, 'label', 'Handpick HFO (Mobilab)',          'callback', 'pac_setMobilabExpress; pac_plotEdit(EEG);');
-uimenu( submenu, 'label', 'Count and save HFO markings',     'callback', 'pac_pop_countHfo(EEG);');
+% uimenu( submenu, 'label', 'Invert polarity',                 'callback', 'EEG = pac_pop_invertPolarity(EEG);  [ALLEEG,EEG,CURRENTSET] = eeg_store(ALLEEG,EEG); eeglab redraw');
+% uimenu( submenu, 'label', 'Convert event names to strings',  'callback', 'EEG = pac_pop_convertNumEventType2Str(EEG);  [ALLEEG,EEG,CURRENTSET] = eeg_store(ALLEEG,EEG); eeglab redraw');
+% uimenu( submenu, 'label', 'Handpick HFO (Mobilab)',          'callback', 'pac_setMobilabExpress; pac_plotEdit(EEG);');
+% uimenu( submenu, 'label', 'Count and save HFO markings',     'callback', 'pac_pop_countHfo(EEG);');
 uimenu( submenu, 'label', 'Compute PAC',                     'callback', '[ALLEEG EEG] = pac_pop_main(ALLEEG, EEG, CURRENTSET);','separator','on');
 uimenu( submenu, 'label', 'Plot HFO-marked raw data',        'callback', 'pac_vis_rawDataPlot(EEG);');
 uimenu( submenu, 'label', 'Copy event markers',              'callback', '[ALLEEG,EEG] = pop_copyEventMarker(ALLEEG,EEG);');

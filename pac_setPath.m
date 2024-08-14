@@ -4,6 +4,7 @@
 % Makoto Miyakoshi, 2014 Swartz Center for Computational Neuroscience, INC, UCSD
 %
 % History:
+% 01/13/2020 Makoto. Updated.
 % 03/28/2014 ver 1.00 by Makoto. Created.
 
 % Copyright (C) 2014, Makoto Miyakoshi SCCN, INC, UCSD
@@ -29,10 +30,6 @@ ok = false;
 
 % find the path to itself
 pactRoot = fileparts(which('pac_setPath.m'));
-        
-% add subfolders to path (if not already present)
-if ~exist('32px-Dialog-apply.svg.png','file')
-    addpath(genpath(pactRoot));
-end
+addpath(genpath(pactRoot));
 
 ok = true;
