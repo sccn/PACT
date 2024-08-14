@@ -57,6 +57,12 @@
 %     phaseProbability : Number of data count in each phase bins.
 %     phaseSrotedAmp   : Mean amplitdes of each phase bins.
 %     phaseSortedAmpSe : Standard errors of amplitdes in each phase bins.
+%
+% When hfoPool==4 (i.e. event-related window-wise PAC), the following items are generated and stored.
+%     windowMeanAmp    : Mean high-freq amp across selected widnows.
+%     windowStdAmp     : Standard dev. of high-freq amp across selected widnows.
+%     windowMeanPhase  : Circular-mean low-freq amp across selected widnows.
+%     windowStdPhase   : Circular-std low-freq amp across selected widnows.
 % 
 % These four structures contains results from different multiple comparison corrections. 
 %     uncorrected      : Channel-wise multiple comparison uncorrected.
@@ -91,7 +97,7 @@
 % Berens (2009) circstat: A MATLAB toolbox for circular statistics. J stat softw. 31.
 
 % History:
-% 08/13/2024 Makoto. whichMarker-1 is changed to whichMarker. Rewrote the stats.
+% 08/14/2024 Makoto. whichMarker-1 is changed to whichMarker. Rewrote the stats. Event-related window mean and std for amp and phase supported upon Henrioco's request.
 % 08/09/2024 Makoto. Fix request by Henrico. 'hfoPool', '4' is added.
 % 01/13/2021 Makoto. Checked for moving to Github.
 % 11/04/2020 Makoto. Removing 1-s data before and after data edges and boundaries to avoid filter's edge effect for window-rejected data.
@@ -343,19 +349,6 @@ switch hfoPoolInput
         outOfDataRangeWinIdx = selectedWindowEdges(:,1)<0 | selectedWindowEdges(:,2)>EEG.pnts;
         selectedWindowEdges(outOfDataRangeWinIdx,:) = [];
 
-        % % Exclude peri-boundary windows.
-        % periBoundaryWindowIdx = [];
-        % for windowIdx = 1:size(selectedWindowEdges,1)
-        %     if any(intersect(periBoundaryIdx, selectedWindowEdges(windowIdx,1):selectedWindowEdges(windowIdx,2)))
-        %         periBoundaryWindowIdx = [periBoundaryWindowIdx; windowIdx];
-        %     end
-        % end
-        % 
-        % % Reject the windows.
-        % combinedRejectionIdx = unique([periBoundaryWindowIdx;outOfBoundaryIdx]);
-        % disp(sprintf('\n\n%d/%d windows rejected for being located within 1-s from boundaries.\n\n', length(combinedRejectionIdx), size(selectedWindowEdges,1)))
-        % selectedWindowEdges(combinedRejectionIdx,:) = [];
-
         % Obtain good window time indices in 1:EEG.pnts.
         goodWindowIdx2D = zeros(winddowLengthInFrame*2, size(selectedWindowEdges,1));
         for selectedWinIdx = 1:size(goodWindowIdx2D,2)
@@ -368,7 +361,7 @@ switch hfoPoolInput
 
         % Obtain the inclusive mask.
         [~, inclusiveMask] = intersect(nonPeriBoundaryTimeIdx, periEventWindowIdx);
-        fprintf('\n\n%.1f%% of data removed for being located within 1-s from a boundary.\n\n\n', 100*(1-length(inclusiveMask)/(size(goodWindowIdx2D,1)*size(goodWindowIdx2D,2))))
+        fprintf('\n\n%.1f%% of data removed for being located within 1-s from a boundary.', 100*(1-length(inclusiveMask)/(size(goodWindowIdx2D,1)*size(goodWindowIdx2D,2))))
 
         % Reshape the extractetd 3D tensor to 2D.
         analyAmpSort   = sort(analyAmp_offTheBoundary(:,inclusiveMask), 2, 'descend');
@@ -379,6 +372,47 @@ switch hfoPoolInput
         for chIdx = 1:EEG.nbchan
             EEG.pac.hfoIndex{chIdx,1} = find(logicalHasMask(chIdx,:));
         end
+
+        %% Henrico made another request.
+
+        % Exclude peri-boundary windows.
+        periBoundaryWindowIdx = [];
+        for windowIdx = 1:size(selectedWindowEdges,1)
+            if any(intersect(periBoundaryIdx, selectedWindowEdges(windowIdx,1):selectedWindowEdges(windowIdx,2)))
+                periBoundaryWindowIdx = [periBoundaryWindowIdx; windowIdx];
+            end
+        end
+
+        % Reject the windows.
+        disp(sprintf('%d/%d windows rejected for being located within 1-s from boundaries.\n\n\n', length(periBoundaryWindowIdx), size(selectedWindowEdges,1)))
+        winEdgesAfterRejection = selectedWindowEdges;
+        winEdgesAfterRejection(periBoundaryWindowIdx,:) = [];
+
+        windowLength = median(diff(winEdgesAfterRejection,1,2));
+        winAmpMatrix   = zeros(EEG.nbchan, windowLength, size(winEdgesAfterRejection,1));
+        winPhaseMatrix = zeros(EEG.nbchan, windowLength, size(winEdgesAfterRejection,1));
+        for windowIdx = 1:size(winEdgesAfterRejection,1)
+            winAmpMatrix(  :,:,windowIdx) = analyAmp(  :, winEdgesAfterRejection(windowIdx,1)+1:winEdgesAfterRejection(windowIdx,2));
+            winPhaseMatrix(:,:,windowIdx) = analyPhase(:, winEdgesAfterRejection(windowIdx,1)+1:winEdgesAfterRejection(windowIdx,2));
+        end
+        meanAmp = mean(winAmpMatrix, 3);
+        stdAmp  = std(winAmpMatrix, 0, 3);
+        meanPhase = circ_mean(winPhaseMatrix, [], 3);
+        stdPhase  = circ_std( winPhaseMatrix, [], [], 3);
+            %{
+            figure
+            for chIdx = 1:32
+                subplot(5,7,chIdx)
+                plot(meanAmp(chIdx,:)); hold on; plot(meanPhase(chIdx,:))
+            end
+            %}
+
+        % Store the results.
+        EEG.pac.windowMeanAmp   = meanAmp;
+        EEG.pac.windowStdAmp    = stdAmp;
+        EEG.pac.windowMeanPhase = meanPhase;
+        EEG.pac.windowStdPhase  = stdPhase;
+
 end
 clear logical* tmp* critical* global* x_* whichMarkerInput windowLengthInput
 
@@ -504,7 +538,6 @@ for chIdx = 1:EEG.nbchan
         end
         trueAmpTensor = repmat(hfoPreselectedAmp', [1 numSurroInput]);
         SurroMI       = abs(mean(trueAmpTensor.*exp(1i*surroPhaseTensor), 1));
-
             % for surroIdx = 1:numSurroInput
             %     tmpSurroPhase   = [analyPhase_offTheBoundary(skipIdx(surroIdx):end) analyPhase_offTheBoundary(1:skipIdx(surroIdx)-1)]; % randomize phase instead of amp- consider circular shifts
             %     surroPhase(:,surroIdx) = tmpSurroPhase(hfoIndex)';
