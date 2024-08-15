@@ -89,8 +89,8 @@ menus.
     -   Number of phase bins \[N\]: This affects sensitivity of circular
         statistics. Don't use too extremely large value (e.g. \>100).
 
-![thumb\|400px\|Figure 3. Detected HFOs (shown in
-red).](images/Demo06.jpg)
+<img src="images/Demo06.jpg" alt="Figure 3. Detected HFOs (shown in
+red)." width="600" />
 
 <i><p style="text-align: center">Figure 3. Detected HFOs (shown in red)</p></i> 
 
@@ -98,19 +98,21 @@ red).](images/Demo06.jpg)
 -   Invert polarity: This is to invert EEG polarity by simply
     multiplying -1 to all the data.
 
-![thumb\|400px\|Figure 4. Manually marking HFOs. Left, using VisEd.
-Right, using customized MoBILAB plots.](images/Demo04.jpg)
+
+
+**The function described in the following section is depricated (works only in Matlab 2013 or older)**
+<img src="images/Demo04.jpg" alt="Figure 4. Manually marking HFOs. Left, using VisEd.
+Right, using customized MoBILAB plots." width="800" />
 
 <i><p style="text-align: center">Figure 4. Manually marking HFOs. Left, using VisEd. Right, using customized MoBILAB plots</p></i> 
 
--   Handpick HFO(VisEd): This plot looks like Figure 4 left. You can
-    choose the marking point by mouse click. For detailed explanation
-    how to use this VisEd, see VisEd help.
--   Handpick HFO(Mobilab): This plot looks like Figure 4 left.
-    Similarly, you can choose the marking point by mouse click. Use
-    whichever suit you.
--   Copy event markers: This is to copy event markers from dataset 1 to
-    dataset 2.
+-   ~~Handpick HFO(VisEd): This plot looks like Figure 4 left. You can~~
+    ~~choose the marking point by mouse click. For detailed explanation~~
+    ~~how to use this VisEd, see VisEd help.~~
+-   ~~Handpick HFO(Mobilab): This plot looks like Figure 4 left.~~
+    ~~Similarly, you can choose the marking point by mouse click. Use~~
+    ~~whichever suit you.~~
+-   ~~Copy event markers: This is to copy event markers from dataset 1 to dataset 2.~~
 
 ![thumb\|400px\|Figure 5. Statistics set
 up.](images/Demo03.jpg)
@@ -151,6 +153,11 @@ Vector Length.
 x-axis.
 
 4\. Bar graphs of LFO phase-sorted HFO-amplitudes.
+
+5\. (When event-related PAC is selected) Time-domain phase-amplitude time
+series. See below.
+
+<img src="images/PactERP.jpg" alt="Time-domain event-related PAC" width="400" />
 
 Note that the number of phase bins in Figures 3a and 3b is determined by
 user input and affects the results of the circular statistics.
