@@ -10,7 +10,8 @@ What data does PACT take?
 -------------------------
 
 Currently it takes continuous data only. PACT was originally developed
-for electrocorticographic (ECoG) data analysis.
+for electrocorticographic (ECoG) data analysis, but it may be used for
+scalp-recorded EEG analysis as well.
 
 What does PACT do?
 ------------------
@@ -90,7 +91,7 @@ menus.
         statistics. Don't use too extremely large value (e.g. \>100).
 
 ![thumb\|400px\|Figure 3. Detected HFOs (shown in
-red).](images/Demo06.jpg)
+red).](images/Demo03.jpg)
 
 <i><p style="text-align: center">Figure 3. Detected HFOs (shown in red)</p></i> 
 
@@ -98,26 +99,12 @@ red).](images/Demo06.jpg)
 -   Invert polarity: This is to invert EEG polarity by simply
     multiplying -1 to all the data.
 
-![thumb\|400px\|Figure 4. Manually marking HFOs. Left, using VisEd.
-Right, using customized MoBILAB plots.](images/Demo04.jpg)
+![thumb\|400px\|Figure 4. Statistics set
+up.](images/Demo04.jpg)
 
-<i><p style="text-align: center">Figure 4. Manually marking HFOs. Left, using VisEd. Right, using customized MoBILAB plots</p></i> 
+<i><p style="text-align: center">Figure 4. Statistics set up</p></i> 
 
--   Handpick HFO(VisEd): This plot looks like Figure 4 left. You can
-    choose the marking point by mouse click. For detailed explanation
-    how to use this VisEd, see VisEd help.
--   Handpick HFO(Mobilab): This plot looks like Figure 4 left.
-    Similarly, you can choose the marking point by mouse click. Use
-    whichever suit you.
--   Copy event markers: This is to copy event markers from dataset 1 to
-    dataset 2.
-
-![thumb\|400px\|Figure 5. Statistics set
-up.](images/Demo03.jpg)
-
-<i><p style="text-align: center">Figure 5. Statistics set up</p></i> 
-
--   Set up statistics: This shows a GUI that look like Figure 5.
+-   Set up statistics: This shows a GUI that look like Figure 4.
 -   Plot Modulation Index: This shows a plot that look like Figure 7/8
     top right.
 -   Plot Angular hist (bar)
@@ -126,12 +113,12 @@ up.](images/Demo03.jpg)
 -   Plot phase-sorted amp: This shows a plot that look like Figure 7/8
     bottom left. Each bar represents mean amplitude of each phase bin.
 
-![thumb\|400px\|Figure 6. Scanning parameter space consists of LFO phase
+![thumb\|400px\|Figure 5. Scanning parameter space consists of LFO phase
 frequencies and HAS rates.](images/Demo05.jpg)
 
-<i><p style="text-align: center">Figure 6. Scanning parameter space consists of LFO phase frequencies and HAS rates</p></i> 
+<i><p style="text-align: center">Figure 5. Scanning parameter space consists of LFO phase frequencies and HAS rates</p></i> 
 
--   Scan LFO freqs (very slow!): This pops up GUI like Figure 6. Start
+-   Scan LFO freqs (very slow!): This pops up GUI like Figure 5. Start
     with N = 10 or around, and HAS rate of 0.3-10. Color normalization
     should be used when plotting Mean Resultant Vector Length.
 
@@ -201,17 +188,13 @@ the Ch1 Modulation Index is much larger than its confidence interval
 level; probably this combination of parameters better fits the
 pathological pattern in this channel signal.
 
-Download Link
--------------
-
-<http://sccn.ucsd.edu/wiki/Plugin_list_process>
 
 Caution and Limitation
 ----------------------
 
 The 'Handpick HFO' menu does not work with newer Matlab versions, which
-no longer support the *graphics.cursorbar* object. To use this function,
-use Matlab 2013 or older as a workaround.
+no longer support the *graphics.cursorbar* object. It works only on
+Matlab 2013 or older and is depricated.
 
 Scanning Phase-frequency vs. HFO-frequency (07/24/2019 updated)
 ---------------------------------------------------------------
@@ -229,36 +212,6 @@ picking up the highest amplitude after high-frequency band-pass filter,
 so if there is artifact with high-frequency (or broadband), HAS will
 pick it up. In this case, you would want to clean the data using EEGLAB
 function before performing this analysis.
-
-In the example below, one can easily find that Ch21 showed the strongest
-PAC between 3-Hz phase and 80-Hz HFO amplitude, followed by Ch16. Ch18
-also showed some PAC, but it coupled with 1.7 Hz instead of 3 Hz so this
-could be something different. If one chooses mean vector length to show
-instead of Canolty's modulation index (MI), it allows to evaluate the
-same measure without the effect of HFO amplitude. The calculated values
-are stored under EEG.pacScan.
-
-![200px](images/PactUpdate1crop.jpg)
-
-![600px](images/PactUpdate2.jpg)
-
-### How to obtain mean HFO gamma amplitude
-
-1.  In the plot above, confirm that the peak PAC value is observed at
-    Ch21, phase 3.2-Hz, ampltiude 80-Hz.
-2.  Type 'EEG.pacScan' in the command line. Among the variables, find
-    'meanHfoAmp' This is mean HFO amplitude in microVolt. If you are not
-    sure about dimensions, see 'dataDimensions'. We know our channel and
-    freq-freq window of interest, which are 21, 3.2 Hz, 80 Hz,
-    respectively. Based on these parameters of interest, we obtain
-    indices for these parameters: 21 for the channel order, 7 for the
-    phase freq (see 'phaseFreqEdge'--3.2Hz is between the 7th and 8th
-    edges, so we select 7), and 1 for the HFO freq.
-3.  We enter EEG.pacScan.meanHfoAmp(21,7,1) in the command window. It
-    returned '35.0391' which mean the mean HFO amplitude during the
-    selected HFO frames was 35.0391 microVolt.
-
-![600px](images/PactUpdate3.jpg)
 
 Bug report, request, comment
 ----------------------------
