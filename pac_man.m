@@ -408,6 +408,7 @@ switch hfoPoolInput
             %}
 
         % Store the results.
+        EEG.pac.winEdgesAfterRejection = winEdgesAfterRejection;
         EEG.pac.windowMeanAmp   = meanAmp;
         EEG.pac.windowStdAmp    = stdAmp;
         EEG.pac.windowMeanPhase = meanPhase;

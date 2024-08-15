@@ -3,6 +3,7 @@
 
 % Author: Makoto Miyakoshi, JSPS/SCCN,INC,UCSD
 % History
+% 08/12/2024 Makoto. Event-related PAC visualization supported. 
 % 01/13/2021 Makoto. Mobilab express removed because unable to update the interactive graphics.
 % 07/24/2019 Makoto. scanHfoByPhase added.
 % 03/28/2014 ver 1.5 by Makoto. pac_setPath added.
@@ -31,7 +32,7 @@
 function vers = eegplugin_pac(fig, try_strings, catch_strings)
 
 % sanity check
-vers = 'PACT0.50';
+vers = 'PACT0.60';
 if nargin < 3
     error('eegplugin_pac requires 3 arguments');
 end
@@ -61,6 +62,7 @@ uimenu( submenu, 'label', 'Plot Modulation Index',           'callback', 'pac_vi
 uimenu( submenu, 'label', 'Plot angular hist (bar)',         'callback', 'pac_vis_angHistBar(EEG);');
 uimenu( submenu, 'label', 'Plot angular hist (polar)',       'callback', 'pac_vis_angHistPolar(EEG);');
 uimenu( submenu, 'label', 'Plot phase-sorted amp',           'callback', 'pac_vis_phaseSortAmp(EEG);');
+uimenu( submenu, 'label', 'Plot event-related PAC',          'callback', 'pac_vis_eventRelatedPac(EEG);');
 uimenu( submenu, 'label', 'Scan HAS x Phase_Freq',           'callback', 'EEG = pac_pop_scanLfoPhaseFreq(EEG);','separator','on');
 uimenu( submenu, 'label', 'Scan HFO_Freq x Phase_Freq',      'callback', 'EEG = pac_pop_scanHfoByPhase(EEG);');
 %uimenu( submenu, 'label', 'Scan LFO freqs (EZ, with phase)', 'callback', 'pac_pop_compareLfoFreqs(EEG);');
