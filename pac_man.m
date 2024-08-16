@@ -97,7 +97,8 @@
 % Berens (2009) circstat: A MATLAB toolbox for circular statistics. J stat softw. 31.
 
 % History:
-% 08/14/2024 Makoto. whichMarker-1 is changed to whichMarker. Rewrote the stats. Event-related window mean and std for amp and phase supported upon Henrioco's request.
+% 08/16/2024 Makoto and Henrico. Supported PAC-ERP visualization suggested by Henrioco Stam, Erasmus University.
+% 08/14/2024 Makoto. Fixed whichMarker-1 to whichMarker. Rewrote the stats.
 % 08/09/2024 Makoto. Fix request by Henrico. 'hfoPool', '4' is added.
 % 01/13/2021 Makoto. Checked for moving to Github.
 % 11/04/2020 Makoto. Removing 1-s data before and after data edges and boundaries to avoid filter's edge effect for window-rejected data.
@@ -114,7 +115,7 @@
 % 09/18/2012 ver 1.1 by Makoto. More accurate window length. EEG.pac.
 % 09/14/2012 ver 1.0 by Makoto. Prototype created.
 
-% Copyright (C) 2012 Makoto Miyakoshi, JSPS/SCCN,INC,UCSD;
+% Copyright (C) 2012 Makoto Miyakoshi, JSPS/SCCN,INC,UCSD; Cincinnati Children's Hospital.
 %
 % This program is free software; you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
@@ -171,6 +172,7 @@ if isfield(EEG, 'pac')
     EEG = rmfield(EEG, 'pac');
 end
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% initial parameter setting %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -183,6 +185,7 @@ windowLengthInput = vararginReader('windowLength', varargin);
 alphaInput        = vararginReader('alpha', varargin);
 numSurroInput     = vararginReader('numSurro', varargin);
 numPhaseBinInput  = vararginReader('numPhaseBin', varargin);
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%
 %%% store parameters %%%
@@ -197,29 +200,31 @@ EEG.pac.alpha        = alphaInput;
 EEG.pac.numSurro     = numSurroInput;
 EEG.pac.numPhaseBin  = numPhaseBinInput;
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% reserve memory for storing results %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 EEG.pac.analyticEEG  = zeros(size(EEG.data));
 
+
 %%%%%%%%%%%%%%%%%%
 %%% DC removal %%%
-%%%%%%%%%%%%%%%%%%    
-EEG.data = EEG.data - repmat(mean(EEG.data, 2), [1 length(EEG.data)]);
+%%%%%%%%%%%%%%%%%%
+EEG.data = bsxfun(@minus, EEG.data, mean(EEG.data,2));
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% compute analytic EEG %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% low frequency phase
+% Low-frequency instantaneous phase.
 EEG_lowFreqPhase  = pop_eegfiltnew(EEG, lfoPhaseInput(1), lfoPhaseInput(end));
 lowFreqPhase_data = EEG_lowFreqPhase.data;
 analyPhase        = angle(hilbert(lowFreqPhase_data'))';
 
-% high frequency amp
+% High-frequency instantaneous amplitude.
 EEG_highFreqAmp   = pop_eegfiltnew(EEG, hfoAmpInput(1),   hfoAmpInput(end));
 highFreqAmp_data  = EEG_highFreqAmp.data;
 analyAmp          = abs(hilbert(highFreqAmp_data'))';
-
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -253,15 +258,18 @@ analyPhase_offTheBoundary = analyPhase(:,offTheBoundaryIdx);
 fprintf('\n\n%.0f boundaries found. %.1f s data will be removed.\n\n\n', length(boundaryLatency), length(periBoundaryIdx)/EEG.srate)
 
 
-% low freq phase + high freq amp
-tmpZ = analyAmp_offTheBoundary.*exp(1i*analyPhase_offTheBoundary);
-EEG.pac.analyticEEG = tmpZ;
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Combine the low-freq phase with the high-freq amp. %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+analyticEEG_PAC = analyAmp_offTheBoundary.*exp(1i*analyPhase_offTheBoundary);
+EEG.pac.analyticEEG = analyticEEG_PAC;
 
-clear EEG_* tmp* z_*
+clear EEG_*
+
 
 switch hfoPoolInput
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% channel-wise pooling %%%
+%%% Channel-wise pooling %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% 
     case 1
         analyAmpSort   = sort(analyAmp_offTheBoundary, 2, 'descend');
@@ -272,8 +280,9 @@ switch hfoPoolInput
             EEG.pac.hfoIndex{chIdx,1} = find(logicalHasMask(chIdx,:));
         end
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% whole-data pooling %%%
+%%% Whole-data pooling %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%% 
     case 2
         tmp = analyAmp_offTheBoundary(:);
@@ -289,12 +298,13 @@ switch hfoPoolInput
             EEG.pac.hfoIndex{chIdx,1} = find(globalHFOmask(chIdx,:));
         end
         
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Handpicked window centers +/- halfWinLen, one event per channel (Mobilab-based event marking, nonconventional for EEGLAB).  %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Handpicked window centers +/- halfWinLen, one event per channel (Mobilab-based event marking, depricated).  %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     case 3 % handpicked
 
-        error('This option requires update. Email Makoto.Miyakoshi@cchmc.org if you want to use it.')
+        error('This option requires update of Mobilab. Email Makoto.Miyakoshi@cchmc.org if you want to use it.')
 
         % % create a list that has channel and latency of the selected event 
         % eventTypes = unique({EEG.event.type});
@@ -329,10 +339,11 @@ switch hfoPoolInput
         %      nonEmptyChannelList(chIdx,1) = ~isempty(EEG.pac.hfoIndex{chIdx,1});
         % end
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Handpicked window centers +/- halfWinLen, one event per channel (EEGLAB's event data i.e. one event for all the channels). %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    case 4 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% EEGLAB's event-based window selection defined by center +/- halfWinLen. %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    case 4 % Requested by Henrico Stam, Erasmus University.
 
         % Obtain the target event times.
         allEventTypes = unique({EEG.event.type});
@@ -373,18 +384,17 @@ switch hfoPoolInput
             EEG.pac.hfoIndex{chIdx,1} = find(logicalHasMask(chIdx,:));
         end
 
-        %% Henrico made another request.
-
+        %% Another request for later visualization addressed here.
         % Exclude peri-boundary windows.
         periBoundaryWindowIdx = [];
         for windowIdx = 1:size(selectedWindowEdges,1)
             if any(intersect(periBoundaryIdx, selectedWindowEdges(windowIdx,1):selectedWindowEdges(windowIdx,2)))
-                periBoundaryWindowIdx = [periBoundaryWindowIdx; windowIdx];
+                periBoundaryWindowIdx = [periBoundaryWindowIdx; windowIdx]; %#ok
             end
         end
 
         % Reject the windows.
-        disp(sprintf('%d/%d windows rejected for being located within 1-s from boundaries.\n\n\n', length(periBoundaryWindowIdx), size(selectedWindowEdges,1)))
+        fprintf('%d/%d windows rejected for being located within 1-s from boundaries.\n\n\n\n', length(periBoundaryWindowIdx), size(selectedWindowEdges,1))
         winEdgesAfterRejection = selectedWindowEdges;
         winEdgesAfterRejection(periBoundaryWindowIdx,:) = [];
 
@@ -413,9 +423,8 @@ switch hfoPoolInput
         EEG.pac.windowStdAmp    = stdAmp;
         EEG.pac.windowMeanPhase = meanPhase;
         EEG.pac.windowStdPhase  = stdPhase;
-
 end
-clear logical* tmp* critical* global* x_* whichMarkerInput windowLengthInput
+
 
 %%%%%%%%%%%%%%%%%%%%%%%
 %%% reserve results %%%
@@ -470,6 +479,7 @@ EEG.pac.phaseProbability              = cell(EEG.nbchan,1);
 EEG.pac.phaseSortedAmp                = cell(EEG.nbchan,1);
 EEG.pac.phaseSortedAmpSe              = cell(EEG.nbchan,1);
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Compute PAC and perform statistics  %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -485,8 +495,9 @@ for chIdx = 1:EEG.nbchan
         disp(['Channel ' num2str(chIdx) ' has no HFO marker.'])
     else
         
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% compute HFO-indexed data  %%%
+    %%% Compute HFO-indexed data  %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         if hfoPoolInput == 1 || hfoPoolInput == 2
             analyAmp_offTheBoundary_included   = abs(  EEG.pac.analyticEEG(chIdx,:));
@@ -500,13 +511,14 @@ for chIdx = 1:EEG.nbchan
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% compute Modulation Index of this HFO %%%
+    %%% Compute Modulation Index of this HFO %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         trueMI              = abs(mean(hfoPreselectedAmp.*exp(1i*hfoPreselectedPhase)));
         EEG.pac.mi(chIdx,1) = trueMI; 
 
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% compute descriptive statistics %%%
+    %%% Compute descriptive statistics %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         % vector length mean
         EEG.pac.vectLength(chIdx,1) = circ_r(hfoPreselectedPhase');
@@ -528,9 +540,10 @@ for chIdx = 1:EEG.nbchan
         % store results
         EEG.pac.angleMean(chIdx,1) = tmpAngle;
         EEG.pac.angleStd(chIdx,1)  = tmpAngleStd;
-                
+               
+
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% statistical test for MI %%%
+    %%% Statistical test for MI %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         surroPhaseTensor = zeros(length(hfoIndex), numSurroInput);
         for surroIterIdx = 1:numSurroInput
@@ -539,12 +552,28 @@ for chIdx = 1:EEG.nbchan
         end
         trueAmpTensor = repmat(hfoPreselectedAmp', [1 numSurroInput]);
         SurroMI       = abs(mean(trueAmpTensor.*exp(1i*surroPhaseTensor), 1));
-            % for surroIdx = 1:numSurroInput
-            %     tmpSurroPhase   = [analyPhase_offTheBoundary(skipIdx(surroIdx):end) analyPhase_offTheBoundary(1:skipIdx(surroIdx)-1)]; % randomize phase instead of amp- consider circular shifts
-            %     surroPhase(:,surroIdx) = tmpSurroPhase(hfoIndex)';
-            % end
-            % SurroMI = abs(hfoPreselectedInstAmp*exp(1i*surroPhase)/length(hfoPreselectedInstAmp));
+
+        % 08/14/2024 Makoto.
+        % I found my previous approach does not make much sense. Why is the range of phase rotation limited to the length of hfoPhase, rather than to the entire valid data?
+            %{
+            minskip = 1;
+            maxskip = length(hfoPhase)-1;
+            skipIdx = ceil(length(hfoPhase).*rand(numSurro*3,1));
+            skipIdx(skipIdx>maxskip) = [];
+            skipIdx(skipIdx<minskip) = [];
+            skipIdx = skipIdx(1:numSurro,1);
+            surroPhase  = zeros(length(hfoIndex), numSurro);
+
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            %%% run matrix computation (much faster) %%%
+            %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+            for surroIdx = 1:numSurro
+                tmpSurroPhase   = [analyPhase(skipIdx(surroIdx):end) analyPhase(1:skipIdx(surroIdx)-1)]; % randomize phase instead of amp- consider circular shifts
+                surroPhase(:,surroIdx) = tmpSurroPhase(hfoIndex)';
+            end
+            %}
         
+
         %%%%%%%%%%%%%%%
         %%% p-value %%%
         %%%%%%%%%%%%%%% 
@@ -557,15 +586,16 @@ for chIdx = 1:EEG.nbchan
             %}
         EEG.pac.uncorrected.MIpval(chIdx,1) = currentPval;
         
+
         %%%%%%%%%%%%%%%%%%%%%%%%%%%
-        %%% confidence interval %%%
+        %%% Confidence interval %%%
         %%%%%%%%%%%%%%%%%%%%%%%%%%%        
         EEG.pac.moduInd95CI(chIdx,1) = prctile(SurroMI, 95);
         EEG.pac.moduInd99CI(chIdx,1) = prctile(SurroMI, 99);
 
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% statistical test for circular distribution of HFO angles %%%
+    %%% Statistical test for circular distribution of HFO angles %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     
         % 07/23/2019 Makoto. Upon fix request by Brian Kavanaugh.
@@ -610,7 +640,7 @@ for chIdx = 1:EEG.nbchan
         clear expectedCounts h p st tmpCdf
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-    %%% compute phase-sorted amplitude %%%
+    %%% Compute phase-sorted amplitude %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
         edges = linspace(-pi,pi,numPhaseBinInput+1);
         [phaseProbability, ~, binIndex] = histcounts(hfoPreselectedPhase, edges);
@@ -645,14 +675,15 @@ for chIdx = 1:EEG.nbchan
 end
 
 %%%%%%%%%%%%%%%%%%
-%%% angle test %%%
+%%% Angle test %%%
 %%%%%%%%%%%%%%%%%%
 for chIdx = 1:EEG.nbchan
     [EEG.pac.uncorrected.phaseWtsnWillPval(chIdx,1),~] = circ_wwtest(EEG.pac.phaseBinValues(chIdx,:), EEG.pac.angleMean);
 end
 
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% multiple comparisons %%%
+%%% Multiple comparisons %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % Bonferroni
 EEG.pac.Bonferroni.MIpval            = EEG.pac.uncorrected.MIpval*EEG.nbchan;
@@ -688,12 +719,10 @@ EEG.pac.multiCompType = 1;
 % close waitber
 close(waitBar)
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% display a message on the screen %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%clc
-%pause(1)
 
+%%%%%%%%%%%%%%%%%%%%%%%
+%%% Display Pacman. %%%
+%%%%%%%%%%%%%%%%%%%%%%%
 disp('                %%%%%%%%%                ');              
 disp('            %%%%         %%%%            ');              
 disp('         %%%                 %%%         ');              
@@ -712,16 +741,15 @@ disp('            %%%%         %%%%%           ');
 disp('                %%%%%%%%%                ');
 disp(newline)
 disp('         I computed them all!            ');
-
-% pause(1)
-% clc
-
+disp(newline)
 disp('PAC is computed and stored in EEG.pac')
 
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+%%
 %%%%%%%%%%%%%%%%%%%%
-%%% subfunctions %%%
+%%% Subfunctions %%%
 %%%%%%%%%%%%%%%%%%%%
 function output = vararginReader(strings,varargin)
 varargin = varargin{1,1};

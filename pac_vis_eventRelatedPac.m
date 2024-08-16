@@ -5,8 +5,10 @@
 %   >>  pac_vis_eventRelatedPac(EEG);
 
 % Author: Makoto Miyakoshi. Cincinnati Children's Hospital 
+%         Henrico Stam. Erasmus University
+%
 % History
-% 08/14/2024 Makoto. Created. Requested by Henrico.
+% 08/14/2024 Makoto and Henrico. Created.
 
 % Copyright (C) 2024, Makoto Miyakoshi, Henrico Stam.
 %
@@ -58,7 +60,7 @@ plotTimeLength = size(meanAmp,2);
 plotTime       = 1000/EEG.srate*(1:plotTimeLength);
 plotTime = plotTime-plotTime(length(plotTime)/2);
 
-figure('NumberTitle','off', 'Name', 'pac_vis_eventRelatedPac')
+figure('NumberTitle','off', 'Name', 'pac_vis_eventRelatedPac', 'Color', [0.93 0.96 1])
 yyaxis left
 fill([plotTime plotTime(end:-1:1)], [phaseEnvUpper phaseEnvLower(end:-1:1)], [0 0 1], 'lineStyle', 'none', 'FaceAlpha', 0.1)
 hold on
