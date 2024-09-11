@@ -12,7 +12,7 @@ What data does PACT take?
 PACT was initially developed for analyzing electrocorticographic (ECoG) data. The
 applicability of using PACT on scalp-recorded EEG relies on the manner in which
 highest-amplitude sampling (HAS) is utilized. For more information, please refer
-to the next section.
+to the next section. The current version of PACT supports event-related data analysis.
 
 What is high-frequency oscillation (HFO) and highest-amplitude sampling (HAS)?
 -------------------------
