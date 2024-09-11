@@ -14,18 +14,21 @@ applicability of using PACT on scalp-recorded EEG relies on the manner in which
 highest-amplitude sampling (HAS) is utilized. For more information, please refer
 to the next section.
 
-What is highest-amplitude sampling (HAS)?
+What is high-frequency oscillation (HFO) and highest-amplitude sampling (HAS)?
 -------------------------
 
 In the field of epileptology, it is well-established that ECoG data reveals the
 presence of transient bursts with high amplitude, which are associated with
 epileptogenesis. These bursts are commonly referred to as high-frequency
 oscillations (HFOs). Various algorithms have been developed to detect HFOs.
-PACT takes advantage of HFO by calculating phase-amplitude coupling (PAC).
-Rather than calculating PAC using all the data points, the PACT first identifies
-potential HFO candidates by applying a straightforward amplitude threshold.
-Afterward, PAC is computed using only the selected data points. When HAS is set to
-100%, it calculates the original Canolty's modulation index (MI).
+However, some neurologists realized that HFO's sensitivity was limited. So they
+considered that pathological HFO may show characteristic coupling with low-frequency
+phase. Thus, they hypothesized that detecting HFOs then evaluating their PAC patterns
+should improve sensitivity. This is the basic motivation of PACT that can quantify
+PAC of HFOs. Thus, the PACT first identifies potential HFO candidates by applying a
+straightforward amplitude threshold. Afterward, PAC is computed using only the selected
+data points. When HAS is set to 100%, it calculates the original Canolty's modulation
+index (MI).
 
 Can we apply PACT on scalp-recorded EEG data (HAS)?
 -------------------------
@@ -58,6 +61,13 @@ Epilepsy Res. 178:106809.
 In this paper, HAS of 2% is used. The relevant description in the method section is cited below.
 
 > Data points with gamma amplitude larger than the 98th percentile were marked as high amplitude samples (HAS)
+
+However, this does not mean 2% is the generally recommended value for all the applications.
+It serves one of the potential anchor points which showed successful results. I recommend we stick to
+familiar values like 5% (0.05), 1% (0.01), etc. that are widely accepted values in the application
+of inferential statistics. As you parametrically change the HAS values from small to large values,
+you might find non-linear responses. You should determine what you are sensing there, whether
+it is an artifact (blinks, saccades, etc.) or brain signals (genuine HFO-PAC in the EEG signals).
 
 
 What does PACT do?
