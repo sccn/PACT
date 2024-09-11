@@ -9,8 +9,56 @@ bug reports or modify the codebase.
 What data does PACT take?
 -------------------------
 
-Currently it takes continuous data only. PACT was originally developed
-for electrocorticographic (ECoG) data analysis.
+PACT was initially developed for analyzing electrocorticographic (ECoG) data. The
+applicability of using PACT on scalp-recorded EEG relies on the manner in which
+highest-amplitude sampling (HAS) is utilized. For more information, please refer
+to the next section.
+
+What is highest-amplitude sampling (HAS)?
+-------------------------
+
+In the field of epileptology, it is well-established that ECoG data reveals the
+presence of transient bursts with high amplitude, which are associated with
+epileptogenesis. These bursts are commonly referred to as high-frequency
+oscillations (HFOs). Various algorithms have been developed to detect HFOs.
+PACT takes advantage of HFO by calculating phase-amplitude coupling (PAC).
+Rather than calculating PAC using all the data points, the PACT first identifies
+potential HFO candidates by applying a straightforward amplitude threshold.
+Afterward, PAC is computed using only the selected data points. When HAS is set to
+100%, it calculates the original Canolty's modulation index (MI).
+
+Can we apply PACT on scalp-recorded EEG data (HAS)?
+-------------------------
+
+The simple answer is yes, as long as you are knowledgeable about the process.
+
+The more detailed answer is that it depends on how you process data. One key
+difference between ECoG and scalp-recorded EEG is that the latter is prone to
+contamination from artifacts such as blinks, eye movements, muscle potentials,
+and line noise at frequencies like 50Hz or 60Hz. Some of these artifacts have
+a dominant power distribution in higher frequency ranges, including beta and gamma.
+
+To effectively apply PACT to scalp-recorded EEG data, it is recommended to select
+data with minimal artifacts. For instance, blinks often produce phase-amplitude
+coupled artifacts. Users should be familiar with the basic qualities of signals
+and artifacts, and exercise caution when using PACT. Additionally, it is advised
+to systematically vary HAS values to observe how it affects the results.
+
+Always remember that while selecting high-amplitudes is effective for identifying
+HFOs in ECoG, it also introduces potential bias towards different types of artifacts
+in scalp-recorded EEG data.
+
+Is there an example paper that applied PACT on scalp-recorded EEG?
+-------------------------
+
+Miyakoshi M, Nariai H, Rajaraman RR, Bernardo D, Shrey DW, Lopour BA, Sim MS, Staba RJ, Hussain SA. (2021).
+Automated preprocessing and phase-amplitude coupling analysis of scalp EEG discriminates infantile spasms from controls during wakefulness.
+Epilepsy Res. 178:106809.
+
+In this paper, HAS of 2% is used. The relevant description in the method section is cited below.
+
+> Data points with gamma amplitude larger than the 98th percentile were marked as high amplitude samples (HAS)
+
 
 What does PACT do?
 ------------------
