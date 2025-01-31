@@ -7,6 +7,7 @@
 % Author: Makoto Miyakoshi, Arnaud Delorme JSPS/SCCN,INC,UCSD
 %
 % History:
+% 01/31/2025 Makoto. When 'each channel'/'all channels' is selected, it failed at the input check. Fixed. Thanks Amir Mohammad Khezri!
 % 08/12/2024 Makoto. GUI fixed. 
 % 08/09/2024 Makoto. Fix request by Henrico.
 % 01/13/2021 Makoto. Checked for moving to Github.
@@ -118,7 +119,8 @@ end
 % if canceled, escape
 if isempty(userInput), return, end
 
-if isempty(userInput{6})
+% If event-related option is selected but window length is not specified, show an error message.
+if userInput{4}==4 & isempty(userInput{6})
     warndlg('Enter the window length in +/-ms for using EEGLAB''s events.')
     return
 end

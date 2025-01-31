@@ -3,6 +3,7 @@
 
 % Author: Makoto Miyakoshi, JSPS/SCCN,INC,UCSD
 % History
+% 01/31/2025 Makoto. Bug fixes. Thanks Amir Mohammad Khezri!
 % 08/12/2024 Makoto. Event-related PAC visualization supported. 
 % 01/13/2021 Makoto. Mobilab express removed because unable to update the interactive graphics.
 % 07/24/2019 Makoto. scanHfoByPhase added.
@@ -13,7 +14,7 @@
 % 12/26/2012 ver 1.1 by Makoto. Minor changes made.
 % 10/22/2012 ver 1.0 by Makoto. Created.
 
-% Copyright (C) 2012, Makoto Miyakoshi JSPS/SCCN,INC,UCSD
+% Copyright (C) 2012, Makoto Miyakoshi JSPS/SCCN,INC,UCSD/Cincinnati Children's Hospital Medical Center.
 %
 % This program is free software; you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
@@ -32,7 +33,7 @@
 function vers = eegplugin_pac(fig, try_strings, catch_strings)
 
 % sanity check
-vers = 'PACT0.60';
+vers = 'PACT0.70';
 if nargin < 3
     error('eegplugin_pac requires 3 arguments');
 end

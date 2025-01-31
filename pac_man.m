@@ -97,6 +97,7 @@
 % Berens (2009) circstat: A MATLAB toolbox for circular statistics. J stat softw. 31.
 
 % History:
+% 01/30/2025 Makoto. Subsampling for 'binValue' is fixed again. Thanks Amir Mohammad Khezri!
 % 08/16/2024 Makoto and Henrico. Supported PAC-ERP visualization suggested by Henrioco Stam, Erasmus University.
 % 08/14/2024 Makoto. Fixed whichMarker-1 to whichMarker. Rewrote the stats.
 % 08/09/2024 Makoto. Fix request by Henrico. 'hfoPool', '4' is added.
@@ -115,7 +116,7 @@
 % 09/18/2012 ver 1.1 by Makoto. More accurate window length. EEG.pac.
 % 09/14/2012 ver 1.0 by Makoto. Prototype created.
 
-% Copyright (C) 2012 Makoto Miyakoshi, JSPS/SCCN,INC,UCSD; Cincinnati Children's Hospital.
+% Copyright (C) 2012 Makoto Miyakoshi, JSPS/SCCN,INC,UCSD; Cincinnati Children's Hospital Medical Center.
 %
 % This program is free software; you can redistribute it and/or modify
 % it under the terms of the GNU General Public License as published by
@@ -271,33 +272,41 @@ switch hfoPoolInput
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Channel-wise pooling %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%% 
-    case 1
-        analyAmpSort   = sort(analyAmp_offTheBoundary, 2, 'descend');
-        critical       = floor(length(analyAmpSort)*hfoTopRatioInput/100);
-        criticalValues = analyAmpSort(:, critical);
-        logicalHasMask = analyAmp_offTheBoundary >= repmat(criticalValues, [1 size(analyAmp_offTheBoundary,2)]);
+    case 1 % Re-done. (01/30/2025)
         for chIdx = 1:EEG.nbchan
-            EEG.pac.hfoIndex{chIdx,1} = find(logicalHasMask(chIdx,:));
+            critical = prctile(analyAmp_offTheBoundary(chIdx,:), 100-EEG.pac.hfoTopRatio);
+            EEG.pac.hfoIndex{chIdx,1} = find(analyAmp_offTheBoundary(chIdx,:)>critical);
         end
+            % analyAmpSort   = sort(analyAmp_offTheBoundary, 2, 'descend');
+            % critical       = floor(length(analyAmpSort)*hfoTopRatioInput/100);
+            % criticalValues = analyAmpSort(:, critical);
+            % logicalHasMask = analyAmp_offTheBoundary >= repmat(criticalValues, [1 size(analyAmp_offTheBoundary,2)]);
+            % for chIdx = 1:EEG.nbchan
+            %     EEG.pac.hfoIndex{chIdx,1} = find(logicalHasMask(chIdx,:));
+            % end
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Whole-data pooling %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%% 
-    case 2
-        tmp = analyAmp_offTheBoundary(:);
-        tmpSort = sort(tmp, 'descend');
-        critical = tmpSort(floor(length(tmpSort)*EEG.pac.hfoTopRatio/100));
-        globalHfoIndex = tmp >= critical;
-
-        % obtain globalHFOmask
-        globalHFOmask = false(length(tmpSort),1);
-        globalHFOmask(globalHfoIndex) = 1;
-        globalHFOmask = reshape(globalHFOmask, size(EEG.data));
+    case 2 % Re-done. (01/30/2025)
+        critical = prctile(analyAmp_offTheBoundary(:), 100-EEG.pac.hfoTopRatio);
         for chIdx = 1:EEG.nbchan
-            EEG.pac.hfoIndex{chIdx,1} = find(globalHFOmask(chIdx,:));
+            EEG.pac.hfoIndex{chIdx,1} = find(analyAmp_offTheBoundary(chIdx,:)>critical);
         end
-        
+            % tmp = analyAmp_offTheBoundary(:);
+            % tmpSort = sort(tmp, 'descend');
+            % critical = tmpSort(floor(length(tmpSort)*EEG.pac.hfoTopRatio/100));
+            % globalHfoIndex = tmp >= critical;
+            % 
+            % % obtain globalHFOmask
+            % globalHFOmask = false(length(tmpSort),1);
+            % globalHFOmask(globalHfoIndex) = 1;
+            % globalHFOmask = reshape(globalHFOmask, size(EEG.data));
+            % for chIdx = 1:EEG.nbchan
+            %     EEG.pac.hfoIndex{chIdx,1} = find(globalHFOmask(chIdx,:));
+            % end
+
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Handpicked window centers +/- halfWinLen, one event per channel (Mobilab-based event marking, depricated).  %%%
@@ -365,7 +374,7 @@ switch hfoPoolInput
         for selectedWinIdx = 1:size(goodWindowIdx2D,2)
             goodWindowIdx2D(:,selectedWinIdx) = selectedWindowEdges(selectedWinIdx,1)+1:selectedWindowEdges(selectedWinIdx,2);
         end
-        periEventWindowIdx = goodWindowIdx2D(:);
+        periEventWindowIdx = round(goodWindowIdx2D(:));
 
         % Obtain non-peri-boundary time indices in 1:EEG.pnts.
         nonPeriBoundaryTimeIdx = setdiff(1:EEG.pnts, periBoundaryIdx);
@@ -440,7 +449,6 @@ EEG.pac.moduInd99CI                   = zeros(EEG.nbchan,1);
 EEG.pac.phaseBinValues                = zeros(EEG.nbchan, numPhaseBinInput+1); % 06/03/2014
 
 EEG.pac.uncorrected.MIpval            = ones(EEG.nbchan,1);
-EEG.pac.uncorrected.MIpval            = ones(EEG.nbchan,1);
 EEG.pac.uncorrected.phaseRayleighPval = ones(EEG.nbchan,1);
 EEG.pac.uncorrected.phaseOmniTestPval = ones(EEG.nbchan,1);
 EEG.pac.uncorrected.phaseRaoSpacePval = ones(EEG.nbchan,1);
@@ -448,7 +456,6 @@ EEG.pac.uncorrected.phaseWtsnWillPval = ones(EEG.nbchan,1);
 EEG.pac.uncorrected.ampChi2GofPval    = ones(EEG.nbchan,1);
 EEG.pac.uncorrected.ampKstestPval     = ones(EEG.nbchan,1);
 
-EEG.pac.Bonferroni.MIpval             = ones(EEG.nbchan,1);
 EEG.pac.Bonferroni.MIpval             = ones(EEG.nbchan,1);
 EEG.pac.Bonferroni.phaseRayleighPval  = ones(EEG.nbchan,1);
 EEG.pac.Bonferroni.phaseOmniTestPval  = ones(EEG.nbchan,1);
@@ -458,7 +465,6 @@ EEG.pac.Bonferroni.ampChi2GofPval     = ones(EEG.nbchan,1);
 EEG.pac.Bonferroni.ampKstestPval      = ones(EEG.nbchan,1);
 
 EEG.pac.BonfHolm.MIpval               = ones(EEG.nbchan,1);
-EEG.pac.BonfHolm.MIpval               = ones(EEG.nbchan,1);
 EEG.pac.BonfHolm.phaseRayleighPval    = ones(EEG.nbchan,1);
 EEG.pac.BonfHolm.phaseOmniTestPval    = ones(EEG.nbchan,1);
 EEG.pac.BonfHolm.phaseRaoSpacePval    = ones(EEG.nbchan,1);
@@ -466,7 +472,6 @@ EEG.pac.BonfHolm.phaseWtsnWillPval    = ones(EEG.nbchan,1);
 EEG.pac.BonfHolm.ampChi2GofPval       = ones(EEG.nbchan,1);
 EEG.pac.BonfHolm.ampKstestPval        = ones(EEG.nbchan,1);
 
-EEG.pac.FDR.MIpval                    = ones(EEG.nbchan,1);
 EEG.pac.FDR.MIpval                    = ones(EEG.nbchan,1);
 EEG.pac.FDR.phaseRayleighPval         = ones(EEG.nbchan,1);
 EEG.pac.FDR.phaseOmniTestPval         = ones(EEG.nbchan,1);
@@ -597,47 +602,56 @@ for chIdx = 1:EEG.nbchan
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% Statistical test for circular distribution of HFO angles %%%
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+        % 01/31/2025 Makoto. Subsampling part fixed.
+        hfoPreselectedPhaseSorted  = sort(hfoPreselectedPhase);
+        binSize                    = floor(length(hfoPreselectedPhaseSorted)/(numPhaseBinInput+1));
+            % If hfoPreselectedPhaseSorted is shorter than the number of phase bins
+            if binSize==0
+                error('Length of identified data is shorter than the number of phase bins. Change input parameters.')
+            end
+        hfoPreselectedPhaseTrimmed = hfoPreselectedPhaseSorted(1:binSize*(numPhaseBinInput+1));
+        subsamplingIdx             = 1:binSize:length(hfoPreselectedPhaseTrimmed);
+        representativeBinValueVec  = hfoPreselectedPhaseSorted(subsamplingIdx);
     
-        % 07/23/2019 Makoto. Upon fix request by Brian Kavanaugh.
-        sortHfoPhase  = sort(hfoPreselectedPhase);
-        binSize       = length(hfoPreselectedPhase)/size(EEG.pac.phaseBinValues,2);
-        nonIntegerIdx = 1:binSize:length(hfoPreselectedPhase);
-        integerIdx    = round(nonIntegerIdx);
-        binValue      = sortHfoPhase(integerIdx);
-    
-        % % Sample every N points. Note that 'binValue' must contain
-        % % sortHfoPhase(1) and sortHfoPhase(end), but the latter one can be
-        % % missed by this indexing -- fixed (05/10/2019 Makoto)
-        % binValue     = sortHfoPhase(1:binSize:length(hfoPreselectedInstPhase));
-        % if length(binValue) == size(EEG.pac.phaseBinValues,2)-1
-        %     binValue(end+1) = sortHfoPhase(end);
-        % end
-        
-        % % I thought it is this kind of problem, but it is not (07/22/2019)
-        % minusPiToPiEdges = linspace(-pi, pi, size(EEG.pac.phaseBinValues,2));
-        % [binValue,EDGES] = histcounts(sortHfoPhase, minusPiToPiEdges);
+        % % 07/23/2019 Makoto. Upon fix request by Brian Kavanaugh.
+        % sortHfoPhase  = sort(hfoPreselectedPhase);
+        % binSize       = length(hfoPreselectedPhase)/size(EEG.pac.phaseBinValues,2);
+        % nonIntegerIdx = 1:binSize:length(hfoPreselectedPhase);
+        % integerIdx    = round(nonIntegerIdx);
+        % binValue      = sortHfoPhase(integerIdx);
 
-        % binSize      = floor(length(hfoPreselectedInstPhase)/numPhaseBin);
-        % sortHfoPhase = sort(hfoPreselectedInstPhase);
-        % binValue     = sortHfoPhase(1:binSize:length(hfoPreselectedInstPhase));
-        % if length(binValue) == size(EEG.pac.phaseBinValues,2)-1
-        %     binValue(end+1) = sortHfoPhase(end);
-        % end
-        % 
-        % % sample every N points
-        % binSize      = floor(length(hfoPreselectedInstPhase)/numPhaseBin);
-        % sortHfoPhase = sort(hfoPreselectedInstPhase);
-        % binValue     = sortHfoPhase(1:binSize:length(hfoPreselectedInstPhase));
+            % % Sample every N points. Note that 'binValue' must contain
+            % % sortHfoPhase(1) and sortHfoPhase(end), but the latter one can be
+            % % missed by this indexing -- fixed (05/10/2019 Makoto)
+            % binValue     = sortHfoPhase(1:binSize:length(hfoPreselectedInstPhase));
+            % if length(binValue) == size(EEG.pac.phaseBinValues,2)-1
+            %     binValue(end+1) = sortHfoPhase(end);
+            % end
+            
+            % % I thought it is this kind of problem, but it is not (07/22/2019)
+            % minusPiToPiEdges = linspace(-pi, pi, size(EEG.pac.phaseBinValues,2));
+            % [binValue,EDGES] = histcounts(sortHfoPhase, minusPiToPiEdges);
+    
+            % binSize      = floor(length(hfoPreselectedInstPhase)/numPhaseBin);
+            % sortHfoPhase = sort(hfoPreselectedInstPhase);
+            % binValue     = sortHfoPhase(1:binSize:length(hfoPreselectedInstPhase));
+            % if length(binValue) == size(EEG.pac.phaseBinValues,2)-1
+            %     binValue(end+1) = sortHfoPhase(end);
+            % end
+            % 
+            % % sample every N points
+            % binSize      = floor(length(hfoPreselectedInstPhase)/numPhaseBin);
+            % sortHfoPhase = sort(hfoPreselectedInstPhase);
+            % binValue     = sortHfoPhase(1:binSize:length(hfoPreselectedInstPhase));
         
         % store bin values
-        EEG.pac.phaseBinValues(chIdx,:) = binValue'; 
+        EEG.pac.phaseBinValues(chIdx,:) = representativeBinValueVec'; 
         
         % uniform distribution statistics (3 circular statistics)
-        EEG.pac.uncorrected.phaseRayleighPval(chIdx,1) = circ_rtest(binValue);   % Rayleigh test
-        EEG.pac.uncorrected.phaseOmniTestPval(chIdx,1) = circ_otest(binValue);   % omnibus or Hodges-Ajne test test
-        EEG.pac.uncorrected.phaseRaoSpacePval(chIdx,1) = circ_raotest(binValue); % Rao's spacing test
+        EEG.pac.uncorrected.phaseRayleighPval(chIdx,1) = circ_rtest(representativeBinValueVec);   % Rayleigh test
+        EEG.pac.uncorrected.phaseOmniTestPval(chIdx,1) = circ_otest(representativeBinValueVec);   % omnibus or Hodges-Ajne test test
+        EEG.pac.uncorrected.phaseRaoSpacePval(chIdx,1) = circ_raotest(representativeBinValueVec); % Rao's spacing test
         
-        clear expectedCounts h p st tmpCdf
 
     %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
     %%% Compute phase-sorted amplitude %%%
