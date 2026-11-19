@@ -55,6 +55,15 @@ if ~exist('circ_rtest','file')
     addpath(p);
 end
 
+if EEG.trials ~= 1 || ndims(EEG.data) ~= 2
+    error('PACT scanning supports continuous data only.');
+end
+if numFreqBins < 4 || numFreqBins ~= round(numFreqBins) || HASnumber <= 0 || HASnumber > 100 || ...
+        any(phaseFreqRange<=0) || any(ampFreqRange<=0) || ...
+        any(diff(phaseFreqRange)<=0) || any(diff(ampFreqRange)<=0) || ampFreqRange(2)>=EEG.srate/2
+    error('Invalid frequency scan parameters.');
+end
+
 if isfield(EEG, 'pacScan')
     EEG = rmfield(EEG,'pacScan');
 end
@@ -123,11 +132,11 @@ disp(sprintf('%.0f boundaries found. %.1f s data will be removed.', length(bound
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Loop phase x amplitude combinations for all the channels. %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-numLoop       = (length(phaseFreqList)-1)*(length(phaseFreqList)-1)*EEG.nbchan;
+numLoop       = (length(phaseFreqList)-1)*(length(ampFreqList)-1)*EEG.nbchan;
 counter       = 0;
 % waitbarHandle = waitbar(counter/numLoop, 'Now processing...');
 
-hfoDataLength = size(EEG.data,2)*HASnumber/100;
+% HAS threshold is computed separately for each channel and band.
 resulVectLen   = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
 mAngle  = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
 modIdx  = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
@@ -173,26 +182,24 @@ for phaseFreqIdx = 1:length(phaseFreqList)-1
 %                 suptitle(sprintf('Phase%.2f, RVL %.3f, p=%.3f', phaseFreqBinCenter(phaseFreqIdx), circ_r(tmpChPhase'), circ_rtest(tmpChPhase')))
 %             end
             
-            [pval, zStats] = circ_rtest(tmpChPhase');
+            if isempty(tmpChPhase)
+                rayleighZ(chIdx,phaseFreqIdx,ampFreqIdx) = NaN;
+                resulVectLen(chIdx,phaseFreqIdx,ampFreqIdx) = NaN;
+                mAngle(chIdx,phaseFreqIdx,ampFreqIdx) = NaN;
+                modIdx(chIdx,phaseFreqIdx,ampFreqIdx) = NaN;
+                hfoAmp(chIdx,phaseFreqIdx,ampFreqIdx) = NaN;
+                continue
+            end
+            [~, zStats] = circ_rtest(tmpChPhase');
             rayleighZ(   chIdx,phaseFreqIdx,ampFreqIdx) = zStats;
             resulVectLen(chIdx,phaseFreqIdx,ampFreqIdx) = circ_r(tmpChPhase');
             mAngle(      chIdx,phaseFreqIdx,ampFreqIdx) = circ_rad2ang(circ_mean(tmpChPhase'));
             modIdx(      chIdx,phaseFreqIdx,ampFreqIdx) = abs(mean(tmpChHfo.*exp(1i*tmpChPhase)));
             hfoAmp(      chIdx,phaseFreqIdx,ampFreqIdx) = mean(tmpChHfo);
             
-            % To store analytic phase for Daisuke's paper. (11/20/2020)
-            if ampFreqIdx == 1 & chIdx == 1
-                    analyticPhaseStack(chIdx, phaseFreqIdx, ampFreqIdx,:) = tmpChPhase;
-            end
-            
-            if length(tmpChPhase) == size(analyticPhaseStack,4)
-                analyticPhaseStack(chIdx, phaseFreqIdx, ampFreqIdx,:) = tmpChPhase;
-            elseif length(tmpChPhase) > size(analyticPhaseStack,4)
-                analyticPhaseStack(chIdx, phaseFreqIdx, ampFreqIdx, :) = tmpChPhase(1:size(analyticPhaseStack,4));
-            elseif length(tmpChPhase) < size(analyticPhaseStack,4)
-                lengthDifference = size(analyticPhaseStack,4)-length(tmpChPhase);
-                analyticPhaseStack(chIdx, phaseFreqIdx, ampFreqIdx, :) = [tmpChPhase tmpChPhase(1:lengthDifference)];
-            end
+            % Per-cell phase samples have unequal lengths. Stacking them
+            % by repetition changes the observations; this legacy field
+            % has been retired in the scientifically validated output.
 
             counter = counter+1;
 %             waitbar(counter/numLoop, waitbarHandle);
@@ -208,7 +215,7 @@ EEG.pacScan.pacAngle     = single(mAngle);
 EEG.pacScan.lfoPhaseMi   = single(modIdx);
 EEG.pacScan.meanHfoAmp   = single(hfoAmp);
 EEG.pacScan.rayleighZ    = single(rayleighZ);
-EEG.pacScan.analyticPhaseStack = single(analyticPhaseStack);
+EEG.pacScan.analyticPhaseStack = []; % Deprecated: unequal-length HAS samples cannot be stacked safely.
 EEG.pacScan.phaseFreqEdges = phaseFreqList;
 EEG.pacScan.ampFreqEdges   = ampFreqList;
 EEG.pacScan.phaseFreqTbw   = phaseFreqTbw;
@@ -257,7 +264,7 @@ else
         % plot
         switch plotType
             case 1
-                imagesc(squeeze(EEG.pacScan.lfoPhaseVect(chIdx,:,:)))
+                imagesc(squeeze(EEG.pacScan.resulVectLen(chIdx,:,:)))
                 colormap('jet')
                 switch normalizeColor
                     case 1
@@ -275,14 +282,14 @@ else
         
         
         % set up x axis
-        tmpLength = round((length(ampFreqList)-1)/6);
+        tmpLength = max(1,round((length(ampFreqList)-1)/6));
         xTick      = 1:tmpLength:length(ampFreqList)-1;
         xTickLabel = ampFreqList(xTick);
         xTickLabel = round(xTickLabel*10)/10;
         set(gca, 'XTick', xTick,  'XTickLabel', xTickLabel)
         
         % set up y axis
-        tmpLength = round((length(phaseFreqList)-1)/6);
+        tmpLength = max(1,round((length(phaseFreqList)-1)/6));
         yTick      = 1:tmpLength:length(phaseFreqList)-1;
         yTickLabel = phaseFreqList(yTick);
         yTickLabel = round(yTickLabel*10)/10;
