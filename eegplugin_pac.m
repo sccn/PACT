@@ -33,7 +33,7 @@
 function vers = eegplugin_pac(fig, try_strings, catch_strings)
 
 % sanity check
-vers = 'PACT0.70';
+vers = 'PACT1.0.0';
 if nargin < 3
     error('eegplugin_pac requires 3 arguments');
 end
