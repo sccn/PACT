@@ -1,3 +1,49 @@
+# PACT 1.0.0 — release candidate
+
+**Version chosen 19 November 2026.** The EEGLAB entrypoint `eegplugin_pac.m`
+now reports `PACT1.0.0`. This is a development-branch release candidate;
+it is **not yet a GitHub release** and is **not merged into `master`**.
+
+## Changes since PACT 0.70
+
+- Continuous EEG: retain the historical Canolty-type `EEG.pac.mi` as a
+  descriptive statistic, and use block-debiased `EEG.pac.dmi` with a
+  block sign-flip null for exploratory inference.
+- Event-related EEG: use a trial-shuffle null for the event-window MI,
+  not the continuous-mode block sign-flip null.
+- Correct sample selection, boundary handling, 100% highest-amplitude
+  sampling, multiple-comparison adjustments, and EEG input immutability.
+- Repair the FIR frequency scans, filter transient exclusion, and associated
+  visualization and GUI paths.
+- Include independent MATLAB regression tests, scientific simulations, and
+  [the validation report](VALIDATION.md).
+
+## Interpretation and compatibility
+
+**The new p-values are not interchangeable with PACT 0.70 p-values.**
+Continuous-mode p-values refer to `dmi`; event-mode p-values refer to
+`mi`. Frequency-scan maps may also differ materially because filter
+defects were corrected. Historical descriptive `mi` itself is retained
+for compatibility.
+
+These tests identify statistical dependence under their stated null
+assumptions, **not physiological evidence of PAC by themselves**.
+Non-sinusoidal waveforms, broadband transients and common inputs can
+create significant results. Multiplicity adjustments cover channels
+only, not searches over frequency bands, HAS rates or conditions.
+The independent holdout simulations found a small, still unexplained
+liberal Type I error excess (approximately 5.4–5.7% at nominal 5%)
+in some configurations.
+
+The scientific validation was run with MATLAB R2024b Update 3,
+EEGLAB 2024.0, and FIRfilt 2.8. Its validated code baseline was
+`c9f067716b3b19e137765633c2ec97f3286bc3d4`; the subsequent
+version/README-only commits have not been independently executed in
+MATLAB. See `VALIDATION.md` for the detailed simulation grid and
+limitations.
+
+---
+
 ## Scientific-safety refactor
 
 The development branch has been exercised locally in MATLAB R2024b and EEGLAB
