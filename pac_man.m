@@ -196,7 +196,7 @@ for ch=1:EEG.nbchan
     out.phaseSortedAmpSe{ch}=se(ordering);
     out.histBinMax(ch)=max(counts);
 
-    [nullMI,~,~]=pac_shiftSurrogate(phase(ch,:),selectedAmp,selectedIdx,...
+    nullMI=pac_shiftSurrogate(phase(ch,:),selectedAmp,selectedIdx,...
                                   validMask,g.numSurro,EEG.srate,g.numPhaseBin);
     out.uncorrected.MIpval(ch)=(1+sum(nullMI>=out.mi(ch)))/(g.numSurro+1);
     out.moduInd95CI(ch)=prctile(nullMI,95);
