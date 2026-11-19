@@ -5,6 +5,7 @@ function test_pact_integration
 % Copyright (C) 2026 Makoto Miyakoshi. GPL-2.0-or-later.
 
 assert(exist('eeg_emptyset','file')==2,'EEGLAB must be on MATLAB path.');
+pac_setPath;
 rng(4);
 fs=100;
 n=6000;
@@ -36,17 +37,39 @@ outRepeat=pac_man(EEG,options{:});
 assert(isequaln(out.pac.mi,outRepeat.pac.mi));
 assert(isequaln(out.pac.uncorrected.MIpval,outRepeat.pac.uncorrected.MIpval));
 for ch=1:2
-    assert(all(out.pac.validSampleMask(out.pac.hfoIndex{ch})));
+    ix=out.pac.hfoIndex{ch};
+    assert(all(out.pac.validSampleMask(ix)));
+    z=out.pac.analyticEEG(ch,ix);
+    assert(abs(out.pac.mi(ch)-abs(mean(z)))<1e-12);
+    assert(abs(out.pac.angleStd(ch)-circ_std(angle(z(:))))<1e-12);
 end
 
 % Event-only analysis excludes all samples outside valid event windows.
 options{8}=4; % hfoPool value
-options{10}=2; % event type 'stim' (unique types sort before 'boundary')
-options{12}=100; % windowLength (ms)
+options{10}=2; % 'stim' follows numeric boundary -99 in the marker menu.
+options{12}=500; % windowLength (ms)
+options{6}=100;
+centers=500:500:5500;
+centers(centers==3000)=[];
+centers=centers+round((0:numel(centers)-1)*3.3);
+EEG.event=struct('type',{-99,'stim','stim'},'latency',{3000.5,80,3030},'duration',0);
+t=(0:n-1)/fs;
+lf=cos(2*pi*3*t);
+gate=false(1,n);
+for center=centers
+    EEG.event(end+1)=struct('type','stim','latency',center,'duration',0);
+    gate(center-50:center+50)=true;
+end
+[~,order]=sort([EEG.event.latency]);
+EEG.event=EEG.event(order);
+EEG.urevent=EEG.event;
+EEG.data=repmat(lf+(1+.8*lf.*gate).*cos(2*pi*28*t),2,1);
 outEvent=pac_man(EEG,options{:});
-assert(isequal(outEvent.data,inputData));
-assert(size(outEvent.pac.winEdgesAfterRejection,1)==2);
-assert(all(outEvent.pac.selectedSampleMask(outEvent.pac.hfoIndex{1})));
-assert(isequal(size(outEvent.pac.windowMeanAmp),[2 21]));
+assert(isequal(outEvent.data,EEG.data) && isequal(outEvent.event,EEG.event));
+assert(isequal(outEvent.urevent,EEG.urevent));
+assert(isequal(outEvent.pac.winEdgesAfterRejection,[centers'-50 centers'+50]));
+assert(isequal(outEvent.pac.hfoIndex{1},find(gate)));
+assert(all(outEvent.pac.uncorrected.MIpval<=.05));
+assert(isequal(size(outEvent.pac.windowMeanAmp),[2 101]));
 fprintf('test_pact_integration: PASS\n');
 end

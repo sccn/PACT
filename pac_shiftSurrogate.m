@@ -41,26 +41,30 @@ if ~isscalar(nSurro) || nSurro<1 || nSurro~=round(nSurro) || ...
     error('PACT:InvalidInput','Invalid surrogate settings.');
 end
 
-blockLength = max(round(0.5*srate),round(5*srate/minPhaseHz));
+blockLength = max(round(0.5*srate),ceil(5*srate/minPhaseHz));
 segments = diff([false validMask false]);
 segmentStarts = find(segments==1);
 segmentEnds = find(segments==-1)-1;
 
 % Each block contributes an observed complex sum; block count matters,
 % not the number of autocorrelated samples inside a high-amplitude burst.
-blockSums = complex(zeros(0,1));
+blockId=zeros(size(validMask));
+offset=0;
 for s=1:numel(segmentStarts)
-    first = segmentStarts(s);
-    last = segmentEnds(s);
-    while first<=last
-        final=min(first+blockLength-1,last);
-        hit = selectedIdx>=first & selectedIdx<=final;
-        if any(hit)
-            blockSums(end+1,1)=sum(amplitude(hit).*exp(1i*phase(selectedIdx(hit)))); %#ok<AGROW>
-        end
-        first=final+1;
-    end
+    span=segmentStarts(s):segmentEnds(s);
+    count=floor(numel(span)/blockLength);
+    if count==0, continue, end
+    blockId(span)=offset+1+floor((0:numel(span)-1)*count/numel(span));
+    offset=offset+count;
 end
+weights=amplitude.*exp(1i*phase(selectedIdx));
+ids=blockId(selectedIdx);
+if any(ids==0)
+    error('PACT:InsufficientBlocks','A selected segment spans fewer than five LFO cycles.');
+end
+blockSums=accumarray(ids(:),weights(:),[offset 1]);
+occupied=accumarray(ids(:),1,[offset 1])>0;
+blockSums=blockSums(occupied);
 nBlocks=numel(blockSums);
 if nBlocks<4
     error('PACT:InsufficientBlocks', ...

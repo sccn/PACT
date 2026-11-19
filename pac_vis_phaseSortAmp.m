@@ -55,6 +55,10 @@ for n = 1:EEG.nbchan
     plotCounter = plotCounter+1;
     subplot(subplotRow,subplotColumn,plotCounter)
 
+    if isempty(EEG.pac.phaseSortedAmp{n})
+        title(sprintf('Ch%d (no phase-bin data)',n));
+        continue
+    end
     bar(EEG.pac.phaseSortedAmp{n,1}, 'FaceColor', [0 86/255 69/255], 'BarWidth', 1); % Billiard 
     hold on
     errorbar(1:EEG.pac.numPhaseBin, EEG.pac.phaseSortedAmp{n,1}, zeros(1,EEG.pac.numPhaseBin), EEG.pac.phaseSortedAmpSe{n,1}, 'LineStyle','none','Color',[0 0 0])

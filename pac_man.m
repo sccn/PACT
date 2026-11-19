@@ -17,7 +17,7 @@ function EEG = pac_man(EEG, varargin)
 %     valid for temporally dependent, HAS-selected samples and are disabled.
 %
 % Event-related mode (hfoPool=4) pools HAS samples only from valid event
-% windows. Its MI p-value is an exploratory time-shift test, NOT a trial-
+% windows. Its MI p-value is an exploratory block-rotation test, NOT a trial-
 % level causal or condition-effect inference.
 %
 % Copyright (C) 2012-2026 Makoto Miyakoshi. GPL-2.0-or-later.
@@ -28,10 +28,10 @@ end
 if ~isfield(EEG,'trials') || EEG.trials ~= 1 || ndims(EEG.data) ~= 2
     error('PACT currently supports continuous two-dimensional EEG only.');
 end
-if ~isnumeric(EEG.data) || isempty(EEG.data) || any(~isfinite(EEG.data(:)))
+if ~isnumeric(EEG.data) || ~isreal(EEG.data) || isempty(EEG.data) || any(~isfinite(EEG.data(:)))
     error('EEG.data must contain finite numeric samples.');
 end
-if EEG.srate <= 0 || size(EEG.data,2) ~= EEG.pnts || size(EEG.data,1) ~= EEG.nbchan
+if ~isscalar(EEG.srate) || ~isfinite(EEG.srate) || EEG.srate <= 0 || size(EEG.data,2) ~= EEG.pnts || size(EEG.data,1) ~= EEG.nbchan
     error('Invalid EEGLAB sampling rate or data dimensions.');
 end
 
@@ -67,17 +67,32 @@ end
 workEEG = EEG;
 if isfield(workEEG,'pac'), workEEG = rmfield(workEEG,'pac'); end
 workEEG.data = bsxfun(@minus,double(EEG.data),mean(double(EEG.data),2));
-lowEEG = pop_eegfiltnew(workEEG,g.lfoPhase(1),g.lfoPhase(2));
-highEEG = pop_eegfiltnew(workEEG,g.hfoAmp(1),g.hfoAmp(2));
-phase = angle(hilbert(double(lowEEG.data')))'; 
-amp = abs(hilbert(double(highEEG.data')))'; 
+% Give FIRfilt an unambiguous boundary list even with mixed marker types.
+isBoundary=false(1,numel(EEG.event));
+for k=1:numel(EEG.event)
+    value=EEG.event(k).type;
+    isBoundary(k)=isequal(value,-99) || strcmpi(string(value),"boundary");
+end
+workEEG.event=EEG.event(isBoundary);
+for k=1:numel(workEEG.event)
+    workEEG.event(k).type='boundary';
+end
+starts=findboundaries(workEEG.event);
+cuts=[starts(starts>=1 & starts<=EEG.pnts) EEG.pnts+1];
+[lowEEG,~,loFir]=pop_eegfiltnew(workEEG,g.lfoPhase(1),g.lfoPhase(2));
+[highEEG,~,hiFir]=pop_eegfiltnew(workEEG,g.hfoAmp(1),g.hfoAmp(2));
+guard=max(round(EEG.srate),(max(numel(loFir),numel(hiFir))-1)/2);
+phase=zeros(size(workEEG.data));
+amp=zeros(size(workEEG.data));
+validMask=false(1,EEG.pnts);
+for segment=1:numel(cuts)-1
+    span=cuts(segment):cuts(segment+1)-1;
+    if numel(span)<=2*guard, continue, end
+    phase(:,span)=angle(hilbert(double(lowEEG.data(:,span).'))).';
+    amp(:,span)=abs(hilbert(double(highEEG.data(:,span).'))).';
+    validMask(span(1)+guard:span(end)-guard)=true;
+end
 clear workEEG lowEEG highEEG
-
-% Original sample-coordinate mask: 1 second near edges and boundaries.
-guard = max(1,round(EEG.srate));
-validMask = true(1,EEG.pnts);
-validMask(1:min(guard,EEG.pnts)) = false;
-validMask(max(1,EEG.pnts-guard+1):EEG.pnts) = false;
 eventTypes = cell(1,numel(EEG.event));
 for k = 1:numel(EEG.event)
     typ = EEG.event(k).type;
@@ -85,11 +100,6 @@ for k = 1:numel(EEG.event)
     elseif isstring(typ), eventTypes{k} = char(typ);
     else, eventTypes{k} = typ;
     end
-end
-boundaryIdx = find(strcmpi(eventTypes,'boundary'));
-for k = boundaryIdx
-    latency = round(EEG.event(k).latency);
-    validMask(max(1,latency-guard):min(EEG.pnts,latency+guard)) = false;
 end
 if ~any(validMask)
     error('No valid samples remain after boundary exclusion.');
@@ -110,12 +120,16 @@ if g.hfoPool == 4
     end
     centers = round([EEG.event(eventIdx).latency]);
     for k = 1:numel(centers)
-        span = centers(k)-halfWin:centers(k)+halfWin;
-        if span(1)<1 || span(end)>EEG.pnts || ~all(validMask(span))
+        first=centers(k)-halfWin;
+        last=centers(k)+halfWin;
+        if ~isfinite(centers(k)) || first<1 || last>EEG.pnts
             continue
         end
-        eventMask(span) = true;
-        selectedWindows(end+1,:) = [span(1) span(end)]; %#ok<AGROW>
+        span=first:last;
+        if all(validMask(span))
+            eventMask(span)=true;
+            selectedWindows(end+1,:)=[first last]; %#ok<AGROW>
+        end
     end
     if isempty(selectedWindows)
         error('No valid event windows remain.');
@@ -155,7 +169,7 @@ out.phaseSortedAmp=cell(EEG.nbchan,1);
 out.phaseSortedAmpSe=cell(EEG.nbchan,1);
 out.uncorrected.MIpval=nan(EEG.nbchan,1);
 
-if g.hfoPool == 2
+if g.hfoPool == 2 && g.hfoTopRatio < 100
     pooledThreshold=prctile(reshape(amp(:,candidateIdx),[],1),100-g.hfoTopRatio);
 end
 edges=linspace(-pi,pi,g.numPhaseBin+1);
@@ -166,7 +180,9 @@ rng(0,'twister');
 out.rngSeed=0;
 
 for ch=1:EEG.nbchan
-    if g.hfoPool==2
+    if g.hfoTopRatio==100
+        threshold=-Inf;
+    elseif g.hfoPool==2
         threshold=pooledThreshold;
     else
         threshold=prctile(amp(ch,candidateIdx),100-g.hfoTopRatio);
@@ -184,7 +200,7 @@ for ch=1:EEG.nbchan
     out.vectLength(ch)=abs(mean(phasors));
     out.vectLengthVar(ch)=1-out.vectLength(ch);
     out.angleMean(ch)=mod(angle(mean(phasors)),2*pi);
-    out.angleStd(ch)=sqrt(-2*log(max(out.vectLength(ch),eps)));
+    out.angleStd(ch)=sqrt(2*max(0,1-out.vectLength(ch)));
     sortedPhase=sort(selectedPhase);
     out.phaseBinValues(ch,:)=quantile(sortedPhase,linspace(0,1,g.numPhaseBin+1));
     bins=discretize(selectedPhase,edges);
@@ -243,7 +259,8 @@ out.currentMcompName='BonfHolm';
 out.currentModIndConfInt='95%';
 out.surrogateMethod='independent phase rotations of nonoverlapping, boundary-safe blocks; within-block PAC sums fixed';
 out.inferenceNotice=['Exploratory cross-block phase consistency MI test. Phase-bin tests ',...
-    'are disabled; event-related mode is not a trial-level hypothesis test.'];
+    'are disabled. Event-locked phase concentration can yield small p-values ',...
+    'with a constant envelope.'];
 if g.hfoPool==4
     out.winEdgesAfterRejection=selectedWindows;
     nWin=size(selectedWindows,1);

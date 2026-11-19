@@ -164,7 +164,7 @@ for phaseFreqIdx = 1:length(phaseFreqList)-1
         thresholdVector = prctile(analyAmp', 100-HASnumber);
 
         for chIdx = 1:EEG.nbchan
-            currentChHfoMask = analyAmp(chIdx,:)>thresholdVector(chIdx);
+            currentChHfoMask = HASnumber==100 | analyAmp(chIdx,:)>thresholdVector(chIdx);
             tmpChHfo   = analyAmp(  chIdx,currentChHfoMask);
             tmpChPhase = analyPhase(chIdx,currentChHfoMask);
             

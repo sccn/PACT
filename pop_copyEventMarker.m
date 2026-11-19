@@ -48,8 +48,7 @@ if EEG.pnts ~= target.pnts || EEG.srate ~= target.srate || ...
 end
 
 % Event information and urevents must be copied as a coherent pair.
-target.event = EEG.event;
-target.urevent = EEG.urevent;
-target = eeg_checkset(target,'eventconsistency');
-ALLEEG(destination)=target;
+ALLEEG(destination).event = EEG.event;
+ALLEEG(destination).urevent = EEG.urevent;
+ALLEEG(destination).saved = 'no';
 fprintf('Event markers copied to dataset %d.\n',destination);

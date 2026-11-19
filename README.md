@@ -1,57 +1,21 @@
-## Scientific-safety refactor (development branch, November 2026)
+## Scientific-safety refactor
 
-**Status: unvalidated draft, not a release.** These changes have been reviewed
-statically, but have **not yet been executed in MATLAB/EEGLAB**. Do not treat
-them as validated for publication, clinical use, or historical-result
-reproduction. Use the master branch for legacy analyses; compare outputs.
+The development branch has been exercised locally in MATLAB R2024b and EEGLAB
+2024.0. See [local validation](VALIDATION.md) for the test commands, simulation
+results, output dimensions, historical comparison and limitations.
 
-### Intentional changes
+`pac_man` preserves the original EEG and uses one-based recording coordinates
+for HAS. In the core, FIR and Hilbert processing respect recording boundaries.
+HAS at 100% includes every eligible sample. Event mode uses the union of
+accepted event windows. MobiLab handpicked mode is unsupported.
 
-* `pac_man` leaves original `EEG.data` and `EEG.event` untouched.
-* HAS indices and analytic samples are in original sample coordinates.
-  Boundary and 1-second recording-edge exclusions use a mask.
-* The exploratory MI null independently rotates the phase of nonoverlapping,
-  boundary-safe time blocks (minimum 5 cycles of the lowest LFO frequency),
-  while keeping each block's within-block PAC vector intact. This tests
-  whether preferred coupling phase is **consistent across time blocks**;
-  it does NOT test generic PAC independence or causal effects. At least
-  four HAS-containing blocks are required; otherwise p-values are NaN.
-  Nonstationarity, event-related designs and burst statistics require
-  additional null-model validation.
-* Monte Carlo one-sided MI p-values are `(1+exceedances)/(numSurro+1)`.
-  Surrogate RNG uses `rng(0,'twister')`; caller RNG state is restored.
-* Bonferroni, Holm and BH-FDR outputs are adjusted channel-wise p-values
-  (not FDR thresholds). Missing channels are excluded.
-* Historic Rayleigh, Omnibus, Rao, Watson-Williams and amplitude Chi-square
-  and K-S tests are disabled (NaN outputs). These tests had unjustified
-  dependence and null assumptions for HAS-selected samples.
-* In `hfoPool=4`, HAS samples are restricted to valid event windows;
-  event-related estimates remain exploratory pooled PAC, not trial-level
-  statistical inference.
-* GUI numeric expressions are rejected rather than evaluated.
-* Kaiser FIR helpers now use the window designed by `kaiserord`, with
-  reflected endpoints and validated data lengths. Responses can differ
-  from historical PACT calculations.
-
-### Restrictions and limitations
-
-* Only continuous, single-trial, channels-by-time EEG is supported.
-* P-values are corrected **across channels**, not over searched frequency
-  bands, HAS rates, event windows, conditions or participant groups.
-* Samples too few for descriptive phase bins result in NaN statistics.
-* Historical PACT significance results will not generally be reproduced.
-* Static inspection only so far: **no MATLAB/EEGLAB execution confirmed**.
-
-### Validation steps required before release
-
-1. Run `code/tests/test_pact_math.m` and `code/tests/test_pact_integration.m`
-   in MATLAB with EEGLAB and its filtering dependencies available.
-2. Test impulse, sinusoidal, chirp and constant inputs for FIR response.
-3. Simulate autocorrelated independent phase and amplitude bursts to
-   measure Type-I error; simulate injected PAC to measure detection power.
-4. Test boundaries, numeric event types, overlapping and edge events, GUI
-   cancellation and invariant original EEG data.
-5. Inspect all GUI paths and plots in a supported EEGLAB environment.
+The MI test rotates independent time blocks conditional on their weighted
+resultant magnitudes. It measures cross-block phase consistency and requires
+at least four HAS-containing blocks. A phase-locked event can concentrate
+phase even with a constant HFO envelope. Interpret the test as exploratory,
+especially for event-related or nonstationary recordings. Channel-wise p-value
+correction does not account for parameter searches. Legacy distribution tests
+are disabled.
 
 ---
 What is PACT?

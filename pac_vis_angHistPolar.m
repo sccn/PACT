@@ -65,6 +65,10 @@ for n = 1:EEG.nbchan
 
     phasetmp = angle(EEG.pac.analyticEEG(n, EEG.pac.hfoIndex{n,1}));
     
+    if isempty(phasetmp)
+        title(sprintf('Ch%d (no HAS samples)',n));
+        continue
+    end
     h = circ_plot(phasetmp','hist',[], EEG.pac.numPhaseBin, true,true,'linewidth',3,'color','r');
 
 

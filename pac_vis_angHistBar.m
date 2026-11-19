@@ -66,13 +66,8 @@ for n = 1:EEG.nbchan
         
     % angular histogram
     phasetmp     = angle(EEG.pac.analyticEEG(n, EEG.pac.hfoIndex{n,1}));
-    phasetmpPosi = phasetmp(phasetmp>0);
-    phasetmpNega = phasetmp(phasetmp<0);
-    phasetmpNega = 2*pi+phasetmpNega;
-    phasetmp     = [phasetmpPosi phasetmpNega];
-    hist(phasetmp, EEG.pac.numPhaseBin);
-    h = findobj(gca, 'Type', 'patch');
-    set(h, 'FaceColor', [16/255 67/255 100/255]); % Marine Blue
+    histogram(mod(phasetmp,2*pi),linspace(0,2*pi,EEG.pac.numPhaseBin+1),...
+        'FaceColor',[16 67 100]/255);
     hold on;
 
     set(gca, 'XTickLabel',{'0','pi','2*pi'},'XTick',[0 3.1415 6.2832], 'CLim',[1 2])
