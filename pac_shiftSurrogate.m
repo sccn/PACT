@@ -1,14 +1,22 @@
-function [miNull, rNull, ampNull] = pac_shiftSurrogate(phase, amplitude, selectedIdx, validMask, nSurro, srate, nBins)
-%PAC_SHIFTSURROGATE Time-shift phase relative to selected amplitudes.
-%   Phase is shifted separately within each uninterrupted valid segment;
-%   no shifted sample crosses an EEGLAB boundary. The HAS sample indices
-%   and observed amplitude values are held fixed. This preserves the
-%   temporal autocorrelation of the phase series within each segment,
-%   unlike randomly permuting individual phase samples.
+function miNull = pac_shiftSurrogate(phase, amplitude, selectedIdx, validMask, nSurro, srate, minPhaseHz)
+%PAC_SHIFTSURROGATE Block-phase-rotation surrogate for pooled PACT MI.
+%   miNull = pac_shiftSurrogate(phase, selectedAmplitude, HASindices, ...
+%       validMask, nSurro, samplingRate, minimumPhaseFrequency)
 %
-%   Null quantities: Canolty MI, resultant length, and the range of
-%   phase-binned mean amplitudes. Not a replacement for trial-level
-%   inference in event-related or nonstationary recordings.
+% We test *cross-block consistency of preferred coupling phase*, conditional
+% on the observed within-block amplitude-phase relationships. Each valid,
+% uninterrupted segment is divided into non-overlapping blocks spanning
+% at least five cycles at the lowest LFO frequency (minimum 0.5 second).
+% Each block's complex PAC sum is independently rotated by a uniformly
+% drawn angle, leaving its magnitude and within-block temporal structure
+% unchanged. No block crosses an EEGLAB boundary.
+%
+% This is NOT a generic test of phase-amplitude independence, and does
+% not support inference for one-off events or nonstationary transitions.
+% At least four HAS-containing blocks are required.
+%
+% Whole-recording circular shifts are deliberately NOT used: for a pure
+% sinusoid, they change only global phase and cannot alter |MI|.
 %
 % Copyright (C) 2026 Makoto Miyakoshi. GPL-2.0-or-later.
 
@@ -16,78 +24,57 @@ phase = phase(:)';
 amplitude = amplitude(:)';
 selectedIdx = selectedIdx(:)';
 validMask = logical(validMask(:)');
-if numel(phase) ~= numel(validMask)
-    error('phase and validMask must have identical lengths.');
+if numel(phase)~=numel(validMask) || numel(amplitude)~=numel(selectedIdx)
+    error('PACT:InvalidInput','Phase, valid mask, HAS index and amplitude lengths conflict.');
 end
-if any(~validMask(selectedIdx))
-    error('HAS samples include invalid/boundary samples.');
+if isempty(selectedIdx) || any(selectedIdx<1 | selectedIdx>numel(phase)) || ...
+        any(selectedIdx~=round(selectedIdx)) || numel(unique(selectedIdx))~=numel(selectedIdx)
+    error('PACT:InvalidInput','HAS index must contain unique valid sample indices.');
 end
-if any(~isfinite(phase(validMask))) || any(~isfinite(amplitude))
-    error('NaN or Inf in phase or selected amplitude.');
+if any(~validMask(selectedIdx)) || any(~isfinite(amplitude)) || ...
+        any(~isfinite(phase(validMask)))
+    error('PACT:InvalidInput','HAS includes invalid samples or nonfinite data.');
 end
-if nSurro < 1 || nSurro ~= round(nSurro)
-    error('nSurro must be a positive integer.');
-end
-
-n = numel(selectedIdx);
-if n == 0
-    error('No HAS samples selected.');
-end
-d = diff([false validMask false]);
-segmentStart = find(d == 1);
-segmentEnd = find(d == -1) - 1;
-
-% Precompute per-segment positions and amplitude weights.
-groups = {};
-for s = 1:numel(segmentStart)
-    sel = find(selectedIdx >= segmentStart(s) & selectedIdx <= segmentEnd(s));
-    if isempty(sel)
-        continue
-    end
-    segmentLength = segmentEnd(s) - segmentStart(s) + 1;
-    if segmentLength < 4
-        error('Selected samples in a segment shorter than four samples.');
-    end
-    entry.phase = phase(segmentStart(s):segmentEnd(s));
-    entry.positions = selectedIdx(sel) - segmentStart(s) + 1;
-    entry.outputIdx = sel;
-    entry.amplitude = amplitude(sel);
-    entry.length = segmentLength;
-    % Keep at least one sample of separation, and prefer >= 1 s
-    % where the uninterrupted segment is long enough.
-    entry.minShift = min(max(1, round(srate)), max(1, floor(segmentLength/4)));
-    groups{end+1} = entry; %#ok<AGROW>
+if ~isscalar(nSurro) || nSurro<1 || nSurro~=round(nSurro) || ...
+        ~isscalar(srate) || ~isfinite(srate) || srate<=0 || ...
+        ~isscalar(minPhaseHz) || ~isfinite(minPhaseHz) || minPhaseHz<=0
+    error('PACT:InvalidInput','Invalid surrogate settings.');
 end
 
-miNull = zeros(1, nSurro);
-rNull = [];
-ampNull = [];
-if nargout > 1
-    rNull = zeros(1,nSurro);
-end
-if nargout > 2
-    ampNull = nan(1,nSurro);
-    edges = linspace(-pi,pi,nBins+1);
-end
-for iteration = 1:nSurro
-    phaseSamples = zeros(1,n);
-    for s = 1:numel(groups)
-        g = groups{s};
-        shift = randi([g.minShift, g.length-g.minShift]);
-        shifted = mod(g.positions-1+shift, g.length) + 1;
-        phaseSamples(g.outputIdx) = g.phase(shifted);
-    end
-    z = exp(1i*phaseSamples);
-    miNull(iteration) = abs(mean(amplitude .* z));
-    if nargout > 1
-        rNull(iteration) = abs(mean(z));
-    end
-    if nargout > 2
-        bin = discretize(phaseSamples, edges);
-        binMean = accumarray(bin(:), amplitude(:), [nBins 1], @mean, NaN);
-        if sum(isfinite(binMean)) >= 2
-            ampNull(iteration) = max(binMean) - min(binMean);
+blockLength = max(round(0.5*srate),round(5*srate/minPhaseHz));
+segments = diff([false validMask false]);
+segmentStarts = find(segments==1);
+segmentEnds = find(segments==-1)-1;
+
+% Each block contributes an observed complex sum; block count matters,
+% not the number of autocorrelated samples inside a high-amplitude burst.
+blockSums = complex(zeros(0,1));
+for s=1:numel(segmentStarts)
+    first = segmentStarts(s);
+    last = segmentEnds(s);
+    while first<=last
+        final=min(first+blockLength-1,last);
+        hit = selectedIdx>=first & selectedIdx<=final;
+        if any(hit)
+            blockSums(end+1,1)=sum(amplitude(hit).*exp(1i*phase(selectedIdx(hit)))); %#ok<AGROW>
         end
+        first=final+1;
     end
+end
+nBlocks=numel(blockSums);
+if nBlocks<4
+    error('PACT:InsufficientBlocks', ...
+        'Only %d HAS-containing blocks; at least four are required for exploratory surrogate inference.',nBlocks);
+end
+
+miNull=zeros(1,nSurro);
+nHAS=numel(selectedIdx);
+% Chunk surrogates to cap peak memory, and use the caller's RNG state.
+chunkSize=256;
+for first=1:chunkSize:nSurro
+    last=min(first+chunkSize-1,nSurro);
+    count=last-first+1;
+    phaseOffsets=2*pi*rand(nBlocks,count);
+    miNull(first:last)=abs(sum(bsxfun(@times,blockSums,exp(1i*phaseOffsets)),1))/nHAS;
 end
 end
