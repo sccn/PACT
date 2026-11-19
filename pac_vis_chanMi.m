@@ -39,7 +39,10 @@ set(gcf,'Color', [0.93 0.96 1]);
 colorScale = jet(360);
 numChan = EEG.nbchan;
 % Plot the statistic that the p-values and null percentiles refer to.
-if isfield(EEG.pac,'dmi')
+if isfield(EEG.pac,'testedStatistic') && strcmp(EEG.pac.testedStatistic,'mi')
+    stat = EEG.pac.mi;
+    statLabel = 'HAS MI (event-shuffle test)';
+elseif isfield(EEG.pac,'dmi')
     stat = EEG.pac.dmi;
     statLabel = 'Block-debiased MI';
 else
@@ -67,7 +70,7 @@ for n = 1:numChan
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% overplot confidence interval %%%
+%%% overplot surrogate null percentile %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 hold on
 switch EEG.pac.confIntType

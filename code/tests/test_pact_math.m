@@ -34,8 +34,11 @@ rng(9);
 rng(9);
 [s2,b]=pac_blockSurrogate(phase,amps,selected,valid,valid,50,fs,2);
 assert(isequal(a,b) && s1==s2);
-assert(numel(a)==50 && all(isfinite(a)) && all(a>=0));
+% Eight occupied blocks: exact enumeration of all 2^7 sign patterns.
+assert(info.exact && numel(a)==128 && all(isfinite(a)) && all(a>=0));
 assert(info.blockLength==250 && info.nBlocks==8);
+assert(abs(info.minAttainableP-2^-7)<1e-15 && info.pval>=2^-7 && info.pval<=1);
+assert(abs(info.pval-mean(a>=s1-1e-12))<1e-12);
 % Independent reference: two valid runs (1449 and 1450 samples), five
 % blocks each, remainder spread evenly; subtract each block's mean phasor.
 ids=zeros(1,3000);
@@ -56,7 +59,15 @@ assert(abs(pac_blockSurrogate(phase+.7,amps,selected,valid,valid,5,fs,2)-s1)<1e-
 % even for a non-uniform (here strongly skewed) phase distribution.
 skewed=phase+.8*sin(phase);
 allValid=find(valid);
-assert(pac_blockSurrogate(skewed,ones(size(allValid)),allValid,valid,valid,5,fs,2)<1e-12);
+[zeroStat,~,zeroInfo]=pac_blockSurrogate(skewed,ones(size(allValid)),allValid,valid,valid,5,fs,2);
+assert(zeroStat==0 && zeroInfo.pval==1,'Degenerate zero statistic must give p = 1.');
+% blockCycles sets the block length: 10 cycles of 2 Hz at 100 Hz = 500 samples.
+[~,~,info10]=pac_blockSurrogate(phase,amps,selected,valid,valid,5,fs,2,10);
+assert(info10.blockLength==500);
+% More than 16 occupied blocks: Monte Carlo with (1+b)/(N+1).
+wide=1:60:3000; wide=wide(valid(wide));
+[~,mc,infoMC]=pac_blockSurrogate(phase,1+cos(phase(wide)),wide,valid,valid,99,fs,20,.5);
+assert(~infoMC.exact && infoMC.nBlocks>16 && numel(mc)==99 && infoMC.minAttainableP==1/100);
 % Runs shorter than one block form their own block instead of failing.
 short=false(1,3000);
 short([1:120 300:420 600:720 900:1020])=true;
@@ -68,6 +79,22 @@ candidate=valid;
 candidate(200)=false;
 expectError(@()pac_blockSurrogate(phase,amps,selected,valid,candidate,5,fs,2),...
     'PACT:InvalidInput');
+% Event shuffle (pac_eventShuffle): exact for W <= 8, independent reference.
+rng(5);
+T=2000; ph=2*pi*rand(1,T); am=1+rand(1,T);
+win=[(101:200:1501)' (101:200:1501)'+49];            % 8 windows of 50 samples
+sel=sort(reshape(bsxfun(@plus,win(:,1),[0 10 20 30 40]).',1,[]));
+[es,enull,einfo]=pac_eventShuffle(ph,am,sel,win,10);
+assert(einfo.exact && numel(enull)==factorial(8) && abs(einfo.minAttainableP-1/factorial(8))<1e-15);
+assert(abs(es-abs(mean(am(sel).*exp(1i*ph(sel)))))<1e-12);
+order=perms(1:8); pick=order(1234,:); ref=0;
+for w=1:8
+    offs=sel(sel>=win(w,1) & sel<=win(w,2))-win(w,1);
+    ref=ref+sum(am(win(w,1)+offs).*exp(1i*ph(win(pick(w),1)+offs)));
+end
+assert(any(abs(enull*numel(sel)-abs(ref))<1e-9),'Shuffle null misses an enumerated permutation.');
+expectError(@()pac_eventShuffle(ph,am,sel,[win(1:7,:); win(7,:)+10],10),'PACT:OverlappingWindows');
+expectError(@()pac_eventShuffle(ph,am,sel(1:15),win(1:3,:),10),'PACT:InsufficientEvents');
 fprintf('test_pact_math: PASS\n');
 end
 
