@@ -104,26 +104,30 @@ ampFreqList
 %%% Remove 1-s peri-boundary data points. %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % This is mainly for window-rejected data to avoid filter's edge effect (11/04/2020 Makoto. Added).
-if ~isempty(EEG.event)
-    boundaryIdx = find(strcmp({EEG.event.type}, 'boundary'));
-    if ~isempty(boundaryIdx)
-        boundaryLatency = round([EEG.event(boundaryIdx).latency]);
-        periBoundaryIdx = [1:EEG.srate (1+EEG.pnts-EEG.srate):EEG.pnts]; % The first and the last 1-s by the edge effect.
-        for boundaryIdx = 1:length(boundaryLatency)
-            periBoundaryIdx = [periBoundaryIdx 1+boundaryLatency(boundaryIdx)-EEG.srate:boundaryLatency(boundaryIdx)+EEG.srate];
+guard=max(1,round(EEG.srate));
+validSamples=true(1,EEG.pnts);
+validSamples(1:min(guard,EEG.pnts))=false;
+validSamples(max(1,EEG.pnts-guard+1):EEG.pnts)=false;
+boundaryLatency=[];
+if isfield(EEG,'event') && ~isempty(EEG.event)
+    eventTypes=cell(1,numel(EEG.event));
+    for k=1:numel(EEG.event)
+        typ=EEG.event(k).type;
+        if isnumeric(typ), eventTypes{k}=num2str(typ);
+        elseif isstring(typ), eventTypes{k}=char(typ);
+        else, eventTypes{k}=typ;
         end
-        periBoundaryIdx = unique(periBoundaryIdx);
-        
-        % Trim indices outside the data range.
-        periBoundaryIdx(periBoundaryIdx<1) = [];
-        periBoundaryIdx(periBoundaryIdx>EEG.pnts) = [];
-    else
-        boundaryLatency = [];
-        periBoundaryIdx = [1:EEG.srate (1+EEG.pnts-EEG.srate):EEG.pnts]; % The first and the last 1-s by the edge effect.
     end
-else
-    boundaryLatency = [];
-    periBoundaryIdx = [1:EEG.srate (1+EEG.pnts-EEG.srate):EEG.pnts]; % The first and the last 1-s by the edge effect.
+    boundaryIdx=find(strcmpi(eventTypes,'boundary'));
+    for k=boundaryIdx
+        center=round(EEG.event(k).latency);
+        validSamples(max(1,center-guard):min(EEG.pnts,center+guard))=false;
+        boundaryLatency(end+1)=center; %#ok<AGROW>
+    end
+end
+periBoundaryIdx=find(~validSamples);
+if ~any(validSamples)
+    error('No samples remain after 1-s edge and boundary exclusion.');
 end
 disp(sprintf('%.0f boundaries found. %.1f s data will be removed.', length(boundaryLatency), length(periBoundaryIdx)/EEG.srate))
 
