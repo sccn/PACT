@@ -61,17 +61,21 @@ if isfield(EEG.event, 'chan')
     end
 end
 
-% create a letter string for drop down menu for selecting event 
-if isfield(EEG.event, 'type')
-    eventTypes = unique({EEG.event.type});
-    for n = 1:length(eventTypes)
-        if n == 1
-            dropDownStrings = eventTypes{1,n};
+% Build event menu using consistent strings, including numeric event types.
+if isfield(EEG,'event') && ~isempty(EEG.event) && isfield(EEG.event,'type')
+    eventTypes = cell(1,numel(EEG.event));
+    for k = 1:numel(EEG.event)
+        t = EEG.event(k).type;
+        if isnumeric(t)
+            eventTypes{k} = num2str(t);
+        elseif isstring(t)
+            eventTypes{k} = char(t);
         else
-            dropDownStrings = [dropDownStrings '|' eventTypes{1,n}]; %#ok<*AGROW>
+            eventTypes{k} = t;
         end
     end
-else % if EEG.event does not exist
+    dropDownStrings = strjoin(unique(eventTypes),'|');
+else
     dropDownStrings = '(non-existent)';
 end
 
