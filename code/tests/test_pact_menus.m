@@ -8,6 +8,27 @@ f=figure; uimenu(f,'tag','tools'); eegplugin_pac(f,struct,struct);
 menu=findall(f,'type','uimenu','label','PACT');
 items=flipud(get(menu,'Children'));
 assert(numel(items)==11);
+% Regression guard (Nov 2026): a batch run hung indefinitely when a menu
+% callback opened MATLAB's inputdlg, which this harness cannot answer and
+% which blocks invisibly in uiwait under -batch. Every dialog reached from a
+% registered callback must go through EEGLAB's inputgui (stubbed below).
+blocking='\<(inputdlg|questdlg|listdlg|uiwait|keyboard)\s*\(';
+pactRoot=fileparts(which('eegplugin_pac'));
+for k=1:numel(items)
+    pending=regexp(get(items(k),'callback'),'(pac_\w+|pop_\w+)(?=\()','match');
+    visited={};
+    while ~isempty(pending)
+        name=pending{1}; pending(1)=[];
+        file=which(name);
+        if any(strcmp(visited,name)) || ~startsWith(file,pactRoot), continue, end
+        visited{end+1}=name; %#ok<AGROW>
+        code=regexprep(fileread(file),'%[^\n]*','');
+        assert(isempty(regexp(code,blocking,'once')),...
+            '%s (reached from menu "%s") calls a blocking dialog the test cannot answer.',...
+            name,get(items(k),'label'));
+        pending=[pending regexp(code,'(pac_\w+|pop_\w+)(?=\()','match')]; %#ok<AGROW>
+    end
+end
 rng(79); EEG=eeg_emptyset; EEG.srate=100; EEG.nbchan=2;
 EEG.pnts=8000; EEG.trials=1; EEG.xmax=79.99; EEG.data=randn(2,8000);
 EEG.chanlocs=struct('labels',{'A','B'});
