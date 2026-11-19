@@ -64,6 +64,7 @@ end
 
 % Filter a private copy, never the returned EEG data.
 workEEG = EEG;
+if isfield(workEEG,'pac'), workEEG = rmfield(workEEG,'pac'); end
 workEEG.data = bsxfun(@minus,double(EEG.data),mean(double(EEG.data),2));
 lowEEG = pop_eegfiltnew(workEEG,g.lfoPhase(1),g.lfoPhase(2));
 highEEG = pop_eegfiltnew(workEEG,g.hfoAmp(1),g.hfoAmp(2));
