@@ -32,7 +32,9 @@ assert(isequal(size(out.pac.analyticEEG),size(inputData)));
 assert(~out.pac.validSampleMask(3000));
 assert(all(isfinite(out.pac.mi)));
 assert(all(out.pac.uncorrected.MIpval>0));
-assert(isequaln(out.pac.mi,pac_man(EEG,options{:}).pac.mi));
+outRepeat=pac_man(EEG,options{:});
+assert(isequaln(out.pac.mi,outRepeat.pac.mi));
+assert(isequaln(out.pac.uncorrected.MIpval,outRepeat.pac.uncorrected.MIpval));
 for ch=1:2
     assert(all(out.pac.validSampleMask(out.pac.hfoIndex{ch})));
 end
