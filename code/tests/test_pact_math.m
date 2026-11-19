@@ -23,16 +23,16 @@ catch ME
 end
 % Surrogate draws are reproducible for a fixed caller RNG.
 fs=100;
-t=(1:1000)/fs;
+t=(1:3000)/fs;
 phase=2*pi*2*t;
-valid=true(1,1000);
-valid(450:550)=false;
-selected=[200:210 800:810];
+valid=true(1,3000);
+valid(1450:1550)=false;
+selected=[200:210 450:460 700:710 900:910 1800:1810 2100:2110 2400:2410 2700:2710];
 amps=1+0.1*cos(phase(selected));
 rng(9);
-a=pac_shiftSurrogate(phase,amps,selected,valid,50,fs,12);
+a=pac_shiftSurrogate(phase,amps,selected,valid,50,fs,2);
 rng(9);
-b=pac_shiftSurrogate(phase,amps,selected,valid,50,fs,12);
+b=pac_shiftSurrogate(phase,amps,selected,valid,50,fs,2);
 assert(isequal(a,b));
 assert(numel(a)==50 && all(isfinite(a)));
 assert(all(a>=0));
