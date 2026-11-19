@@ -8,8 +8,9 @@ function EEG = pac_man(EEG, varargin)
 %   * Does not modify original EEG.data or EEG.event.
 %   * Maintains sample coordinates; excluded samples remain in analyticEEG
 %     but are never selected or used to build surrogate distributions.
-%   * Time shifts LFO phase within uninterrupted valid segments, retaining
-%     temporal autocorrelation. The amplitude sample set remains fixed.
+%   * Independently phase-rotates long, uninterrupted time blocks (>=5 LFO
+%     cycles), retaining within-block structure. HAS amplitudes are fixed.
+%     Tests preferred phase consistency across blocks, not general PAC null.
 %   * Uses (1 + exceedances)/(1 + iterations) for empirical p-values.
 %   * Reports adjusted channel-wise Holm and Benjamini-Hochberg p-values.
 %   * Historical phase and amp distribution tests are not inferentially
@@ -197,11 +198,19 @@ for ch=1:EEG.nbchan
     out.phaseSortedAmpSe{ch}=se(ordering);
     out.histBinMax(ch)=max(counts);
 
-    nullMI=pac_shiftSurrogate(phase(ch,:),selectedAmp,selectedIdx,...
-                                  validMask,g.numSurro,EEG.srate,g.numPhaseBin);
-    out.uncorrected.MIpval(ch)=(1+sum(nullMI>=out.mi(ch)))/(g.numSurro+1);
-    out.moduInd95CI(ch)=prctile(nullMI,95);
-    out.moduInd99CI(ch)=prctile(nullMI,99);
+    try
+        nullMI=pac_shiftSurrogate(phase(ch,:),selectedAmp,selectedIdx,...
+                                  validMask,g.numSurro,EEG.srate,g.lfoPhase(1));
+        out.uncorrected.MIpval(ch)=(1+sum(nullMI>=out.mi(ch)))/(g.numSurro+1);
+        out.moduInd95CI(ch)=prctile(nullMI,95);
+        out.moduInd99CI(ch)=prctile(nullMI,99);
+    catch ME
+        if strcmp(ME.identifier,'PACT:InsufficientBlocks')
+            warning('PACT:InsufficientBlocks','Channel %d: %s',ch,ME.message);
+        else
+            rethrow(ME)
+        end
+    end
 end
 
 % Legacy tests were incorrectly applied to HAS-selected temporal samples.
@@ -232,8 +241,8 @@ out.currentPhaseTestName='descriptive';
 out.currentAmpTestName='descriptive';
 out.currentMcompName='BonfHolm';
 out.currentModIndConfInt='95%';
-out.surrogateMethod='within-segment circular phase shift; HAS amplitudes fixed';
-out.inferenceNotice=['Exploratory surrogate MI test. Phase-bin distribution tests ',...
+out.surrogateMethod='independent phase rotations of nonoverlapping, boundary-safe blocks; within-block PAC sums fixed';
+out.inferenceNotice=['Exploratory cross-block phase consistency MI test. Phase-bin tests ',...
     'are disabled; event-related mode is not a trial-level hypothesis test.'];
 if g.hfoPool==4
     out.winEdgesAfterRejection=selectedWindows;
