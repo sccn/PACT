@@ -36,14 +36,20 @@ if isempty(userInput), return, end
 % decode user input
 destination = str2double(userInput{1,1});
 
-% data status check
-if destination     > length(ALLEEG);                   error('Invalid dataset index.'); end
-if EEG.pnts       ~= ALLEEG(1,destination).pnts;       error('Data lengths are different.'); end
-if EEG.srate      ~= ALLEEG(1,destination).srate;      error('Sampling rates are different.'); end
-if size(EEG.data) ~= size(ALLEEG(1,destination).data); error('Data sizes are different.'); end
+% Validate destination without mutating other datasets on invalid input.
+if ~isscalar(destination) || ~isfinite(destination) || ...
+        destination~=round(destination) || destination<1 || destination>numel(ALLEEG)
+    error('Invalid dataset index.');
+end
+target = ALLEEG(destination);
+if EEG.pnts ~= target.pnts || EEG.srate ~= target.srate || ...
+        EEG.trials ~= target.trials || ~isequal(size(EEG.data),size(target.data))
+    error('Source and destination data dimensions or sampling rates differ.');
+end
 
-% copy event markers
-ALLEEG(1,destination).event = EEG.event;
-
-% display message
-disp('Event markers copied.')
+% Event information and urevents must be copied as a coherent pair.
+target.event = EEG.event;
+target.urevent = EEG.urevent;
+target = eeg_checkset(target,'eventconsistency');
+ALLEEG(destination)=target;
+fprintf('Event markers copied to dataset %d.\n',destination);
