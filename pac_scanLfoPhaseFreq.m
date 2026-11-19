@@ -36,6 +36,37 @@ if ~exist('circ_rtest','file')
     addpath(p);
 end
 
+if EEG.trials ~= 1 || ndims(EEG.data) ~= 2
+    error('This scan requires continuous, non-epoched EEG.');
+end
+if numPhaseFreqs<3 || numPhaseFreqs~=round(numPhaseFreqs) || ...
+        numHasRates<2 || numHasRates~=round(numHasRates) || ...
+        any(phaseFreqRange<=0) || phaseFreqRange(2)>=EEG.srate/2 || ...
+        any(diff(phaseFreqRange)<=0) || any(hasRateRange<=0) || ...
+        any(hasRateRange>100) || any(diff(hasRateRange)<=0) || ...
+        ampFreqRange(1)<=0 || ampFreqRange(1)>=EEG.srate/2 || ...
+        ~(ampFreqRange(2)==0 || ...
+          (ampFreqRange(2)>ampFreqRange(1) && ampFreqRange(2)<EEG.srate/2))
+    error('Invalid scan frequency, sample-count, or HAS range.');
+end
+% The legacy FFT FIR scanner filters concatenated data as one sequence,
+% so boundary-containing recordings must be rejected rather than silently
+% treating discontinuities as neuronal transients.
+if isfield(EEG,'event') && ~isempty(EEG.event)
+    types=cell(1,numel(EEG.event));
+    for k=1:numel(EEG.event)
+        value=EEG.event(k).type;
+        if isnumeric(value), types{k}=num2str(value);
+        elseif isstring(value), types{k}=char(value);
+        else, types{k}=value;
+        end
+    end
+    if any(strcmpi(types,'boundary'))
+        error(['Legacy HAS-frequency scan cannot safely filter EEG with boundaries. ',...
+               'Use a genuinely continuous recording or a boundary-aware method.']);
+    end
+end
+
 if isfield(EEG, 'pacScan')
     EEG = rmfield(EEG,'pacScan');
 end
@@ -142,14 +173,14 @@ for n = 1:EEG.nbchan
     
 
     % set up x axis
-    tmpLength = round(length(hasRateList)/7);
+    tmpLength = max(1,round(length(hasRateList)/7));
     xTick      = 1:tmpLength:length(hasRateList);
     xTickLabel = hasRateList(xTick);
     xTickLabel = round(xTickLabel*10)/10;
     set(gca, 'XTick', xTick, 'XTickLabel', xTickLabel)
 
     % set up y axis
-    tmpLength = round((length(phaseFreqList)-1)/6);
+    tmpLength = max(1,round((length(phaseFreqList)-1)/6));
     yTick      = 1:tmpLength:length(phaseFreqList)-1;
     yTickLabel = phaseFreqList(yTick);
     yTickLabel = round(yTickLabel*10)/10;
