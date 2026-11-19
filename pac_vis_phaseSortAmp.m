@@ -59,19 +59,29 @@ for n = 1:EEG.nbchan
     hold on
     errorbar(1:EEG.pac.numPhaseBin, EEG.pac.phaseSortedAmp{n,1}, zeros(1,EEG.pac.numPhaseBin), EEG.pac.phaseSortedAmpSe{n,1}, 'LineStyle','none','Color',[0 0 0])
     
-    yMax = max(EEG.pac.phaseSortedAmp{n,1} + EEG.pac.phaseSortedAmpSe{n,1});
-    yMin = min(EEG.pac.phaseSortedAmp{n,1});
+    means = EEG.pac.phaseSortedAmp{n,1};
+    errors = EEG.pac.phaseSortedAmpSe{n,1};
+    finite = isfinite(means);
+    if ~any(finite)
+        title(sprintf('Ch%d (no phase-bin data)',n));
+        continue
+    end
+    yMax = max(means(finite) + errors(finite));
+    yMin = min(means(finite));
     xlim([0.5 EEG.pac.numPhaseBin+0.5])
-    ylim([yMin*0.85 yMax*1.15])
+    if yMax <= yMin
+        ylim([yMin-1 yMax+1]);
+    else
+        margin = max((yMax-yMin)*.1,eps);
+        ylim([yMin-margin yMax+margin]);
+    end
     xlabel('phase')
     ylabel('amp (uV)')
     hold on
 
-    % overplot a cosine wave
-    t = 0:0.1:EEG.pac.numPhaseBin;
-    oneCycleConstant = EEG.pac.numPhaseBin/6.28; % 0 to 2pi
-    plot(t, (cos(t/oneCycleConstant)+1)/4*(yMax*1.15-yMin*0.85) + yMin*0.85, 'r', 'LineWidth',2)
-    set(gca, 'XTickLabel',{'0','pi','2*pi'},'XTick',[0 EEG.pac.numPhaseBin/2 EEG.pac.numPhaseBin], 'CLim',[1 2])
+    % Phase-bin means are descriptive; no arbitrary cosine reference overlay.
+    set(gca, 'XTickLabel',{'0','pi','2*pi'},...
+        'XTick',[1 EEG.pac.numPhaseBin/2 EEG.pac.numPhaseBin]);
 
     % plot statistical significance
     sigChan = find(EEG.pac.currentAmpTest < EEG.pac.alpha);
