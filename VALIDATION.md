@@ -311,7 +311,7 @@ type-I errors.
 | C03 | 300 s | 20% | 23.8 | 22.0 | 22.5 | 23.5 |
 | C03 | 300 s | 100% | 29.8 | 29.0 | 30.5 | 30.5 |
 
-C01 (sawtooth) is increasingly detected with HAS and length (up to 47% at 100% HAS, 300 s). C02 (spike-and-wave at random times) is barely detected. C03 (identical evoked responses, continuous mode) — see table; event mode handles this case (§4.6).
+C01 (sawtooth) is increasingly detected with HAS and length (up to 47% at 100% HAS, 300 s). C02 (spike-and-wave at random times) is barely detected. In continuous mode, C03 (an identical evoked ERP plus HFO burst every 2.5 s) is flagged in up to 30% of channels at 20–100% HAS. Use event mode for event-locked designs (§4.6).
 
 **Power (development grid)** — % rejected, 400 channels per cell.
 
@@ -348,7 +348,7 @@ C01 (sawtooth) is increasingly detected with HAS and length (up to 47% at 100% H
 | P03 | 300 s | 20% | 1.0 | 0.0 | 0.0 | 0.0 |
 | P03 | 300 s | 100% | 0.0 | 0.0 | 0.0 | 0.0 |
 
-P03 (preferred phase rotating once per minute) is almost never detected, because block contributions cancel. The test requires a consistent preferred phase.
+P03 (k = 0.3 with the preferred phase rotating once per minute) is detected in 0–6% of channels, at or below the null rate, because block contributions cancel. The test requires a consistent preferred phase. With 20-cycle blocks on 60 s data, no channel can reach p ≤ 0.05 at all (0.0 columns; see `minAttainableP`).
 
 ### 4.6 Event mode (`validate_pact_events`, 400 channels per cell)
 
