@@ -10,11 +10,14 @@ reproduction. Use the master branch for legacy analyses; compare outputs.
 * `pac_man` leaves original `EEG.data` and `EEG.event` untouched.
 * HAS indices and analytic samples are in original sample coordinates.
   Boundary and 1-second recording-edge exclusions use a mask.
-* The exploratory MI null uses LFO phase time shifts separately within
-  uninterrupted valid segments, holding HAS index and HFO amplitude fixed.
-  This preserves within-segment phase temporal dependence, but tests a
-  shift-based association null, NOT causal independence; nonstationarity
-  and event-related designs require their own validation.
+* The exploratory MI null independently rotates the phase of nonoverlapping,
+  boundary-safe time blocks (minimum 5 cycles of the lowest LFO frequency),
+  while keeping each block's within-block PAC vector intact. This tests
+  whether preferred coupling phase is **consistent across time blocks**;
+  it does NOT test generic PAC independence or causal effects. At least
+  four HAS-containing blocks are required; otherwise p-values are NaN.
+  Nonstationarity, event-related designs and burst statistics require
+  additional null-model validation.
 * Monte Carlo one-sided MI p-values are `(1+exceedances)/(numSurro+1)`.
   Surrogate RNG uses `rng(0,'twister')`; caller RNG state is restored.
 * Bonferroni, Holm and BH-FDR outputs are adjusted channel-wise p-values
