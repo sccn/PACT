@@ -11,26 +11,46 @@ accepted event windows. MobiLab handpicked mode is unsupported.
 
 **MI statistics (changed November 2026).** `EEG.pac.mi` keeps its historical
 definition, |mean(HFO amplitude × exp(i·LFO phase))| over HAS samples, and is
-descriptive. The p-value (`uncorrected.MIpval` and its corrections) tests the
-*block-debiased MI*, `EEG.pac.dmi`. Each uninterrupted, boundary-safe stretch of
-data is split into blocks of at least 5 cycles of the lowest LFO frequency
-(and at least 0.5 s). Within each block, the mean LFO phasor of that block's
-eligible samples is subtracted before the HAS samples are summed. The null
-distribution flips the sign of each block's contribution at random. This
-removes the phase-clustering bias that non-sinusoidal LFOs create in the raw
-MI. It also respects the temporal autocorrelation that the historical
-sample-permutation null ignored. In simulations, the historical null rejected
-4–56% of true-null channels, and the earlier block-rotation draft rejected up
-to 100% with non-sinusoidal LFOs. The revised test stayed at 1.7–5.9%
-(nominal 5%). See [VALIDATION.md](VALIDATION.md).
+descriptive. `EEG.pac.testedStatistic` names the statistic that the p-values
+(`uncorrected.MIpval` and its corrections) and the null percentiles
+(`moduInd95CI`, `moduInd99CI`; historical names, not confidence intervals)
+refer to:
 
-Interpret the test as exploratory. It assumes independent, centrally symmetric
-block contributions under the null. Event-locked waveforms, broadband
-transients and dependence that spans blocks can violate this assumption. At
-least four HAS-containing blocks are required, otherwise p-values are NaN.
-Channel-wise correction does not account for searches over frequencies, HAS
-rates or conditions. The legacy phase and amplitude distribution tests are
-disabled.
+* **Continuous modes** (`hfoPool` 1 and 2) test the *block-debiased MI*,
+  `EEG.pac.dmi`. Boundary-safe stretches of data are split into blocks of
+  `blockCycles` (default 5) cycles of the lowest LFO frequency, and at least
+  0.5 s. In each block, the mean LFO phasor of that block's eligible
+  (candidate) samples is subtracted before the HAS samples are summed. The
+  null flips the sign of each block's contribution. It is exact when at most
+  16 blocks are occupied, where p cannot fall below 2^(1−K) (see
+  `minAttainableP`), and Monte Carlo otherwise. The null tests *statistical
+  dependence* between HFO amplitude and LFO phase. It assumes independent,
+  centrally symmetric block contributions.
+* **Event mode** (`hfoPool` 4) tests `mi` against a *trial-shuffle* null.
+  Each event window's amplitudes are paired with another window's phases at
+  the same latencies. This detects event-to-event covariation of amplitude
+  with phase. Responses that are identical at every event (evoked waveforms,
+  phase concentration with an unmodulated envelope) are not reported as
+  coupling. Windows must not overlap, and at least four events are required.
+
+In simulations (see [VALIDATION.md](VALIDATION.md)), the historical
+sample-permutation null rejected 4–56% of channels without coupling. The
+earlier block-rotation draft rejected up to 100% with non-sinusoidal LFOs.
+The current tests stay near the nominal 5%.
+
+Interpret all p-values as exploratory. Sharp non-sinusoidal waveforms,
+broadband transients and common inputs create genuine statistical dependence
+that is not evidence of physiological PAC. Channel-wise correction does not
+account for searches over frequencies, HAS rates or conditions. The legacy
+phase and amplitude distribution tests are disabled.
+
+**Frequency scans.** Both scans exclude filter transients at recording edges
+and boundaries (half the longest filter). They reject configurations whose
+filters leave no valid data. The HFO-by-phase scan keeps every band's
+transition inside the band. The HAS-by-LFO scan uses a verified 40 dB Kaiser
+design. Its −6 dB bands extend about 10% beyond each requested edge, so
+adjacent rows overlap. Scan values therefore differ from versions before
+November 2026.
 
 **Third-party code.** PACT bundles CircStat by Philipp Berens
 (P. Berens, *CircStat: A MATLAB Toolbox for Circular Statistics*, J Stat Softw

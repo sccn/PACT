@@ -108,5 +108,12 @@ locked.urevent=locked.event;
 evalc(['outLocked=pac_man(locked,''lfoPhase'',[3 5],''hfoAmp'',[20 36],''hfoTopRatio'',100,',...
     '''hfoPool'',4,''whichMarker'',1,''windowLength'',40,''numSurro'',199,''numPhaseBin'',4);']);
 assert(outLocked.pac.mi>.5 && outLocked.pac.uncorrected.MIpval>.05);
+% Regression: 25-s blocks (75 cycles of 3 Hz) leave 4 blocks in 120 s (p >= 0.125).
+% The p-value is valid but can never reach 0.05; pac_man must warn.
+lastwarn('');
+evalc(['short=pac_man(locked,''lfoPhase'',[3 5],''hfoAmp'',[20 36],''hfoTopRatio'',20,',...
+    '''numSurro'',99,''blockCycles'',75,''numPhaseBin'',4);']);
+[~,id]=lastwarn;
+assert(short.pac.exactNull && short.pac.minAttainableP>.05 && strcmp(id,'PACT:Underpowered'));
 fprintf('test_pact_integration: PASS\n');
 end

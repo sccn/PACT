@@ -280,6 +280,16 @@ for ch=1:EEG.nbchan
     end
 end
 
+% A valid p-value that can never reach alpha (few blocks or events) is
+% easily mistaken for evidence of no coupling; say so explicitly.
+untestable=find(isfinite(out.uncorrected.MIpval) & out.minAttainableP>g.alpha);
+if ~isempty(untestable)
+    warning('PACT:Underpowered',['Channels %s cannot reach p <= %g: the smallest attainable ',...
+        'p-value is %.3g (too few occupied blocks or events). Use longer recordings, ',...
+        'shorter blocks (blockCycles) or more events.'],mat2str(untestable(:).'),g.alpha,...
+        min(out.minAttainableP(untestable)));
+end
+
 % Legacy tests were incorrectly applied to HAS-selected temporal samples.
 % Keep field names for plotting compatibility but do not report p-values.
 legacy={'phaseRayleighPval','phaseOmniTestPval','phaseRaoSpacePval',...
