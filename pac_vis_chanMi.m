@@ -95,7 +95,7 @@ hold on
 [ax,h3,h4] = plotyy(1:EEG.nbchan, zeros(1,EEG.nbchan), 1:EEG.nbchan, EEG.pac.vectLength);
 set(h3, 'Color', [1 1 1], 'LineStyle', 'none')
 set(ax(1), 'YTick', 5:5:100, 'YColor', 'k', 'Box', 'off')
-set(get(gca, 'YLabel'), 'String', 'Modulation Index with CI', 'FontSize', 10)
+set(get(gca, 'YLabel'), 'String', 'MI / surrogate null percentile', 'FontSize', 10)
 xlim(ax(1), [0 EEG.nbchan+1])
 ylim(ax(1), [0 max(max(validMi)*1.1,eps)])
 
@@ -108,7 +108,7 @@ if isempty(validR), validR = 1; end
 ylim(ax(2), [0 max(max(validR)*1.1,eps)])
 
 annotation(gcf,'textbox', [0 1 1 0],...
-    'String',{'Modulation Index (bar; red star, significant), Mean Angle (color-coded), and Resultant Vector Length (line).'},...
+    'String',{'Modulation Index (bar; red star, significant; black bars, surrogate null percentiles), Mean Angle (color-coded), and Resultant Vector Length (line).'},...
     'HorizontalAlignment','center', 'FontSize', 10, 'FitBoxToText','off', 'LineStyle','none', 'FontName','Arial');
 
 % display explanations in the figure name
