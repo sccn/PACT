@@ -60,9 +60,15 @@ for s = 1:numel(segmentStart)
 end
 
 miNull = zeros(1, nSurro);
-rNull = zeros(1, nSurro);
-ampNull = nan(1, nSurro);
-edges = linspace(-pi, pi, nBins+1);
+rNull = [];
+ampNull = [];
+if nargout > 1
+    rNull = zeros(1,nSurro);
+end
+if nargout > 2
+    ampNull = nan(1,nSurro);
+    edges = linspace(-pi,pi,nBins+1);
+end
 for iteration = 1:nSurro
     phaseSamples = zeros(1,n);
     for s = 1:numel(groups)
@@ -73,11 +79,15 @@ for iteration = 1:nSurro
     end
     z = exp(1i*phaseSamples);
     miNull(iteration) = abs(mean(amplitude .* z));
-    rNull(iteration) = abs(mean(z));
-    bin = discretize(phaseSamples, edges);
-    binMean = accumarray(bin(:), amplitude(:), [nBins 1], @mean, NaN);
-    if sum(isfinite(binMean)) >= 2
-        ampNull(iteration) = max(binMean) - min(binMean);
+    if nargout > 1
+        rNull(iteration) = abs(mean(z));
+    end
+    if nargout > 2
+        bin = discretize(phaseSamples, edges);
+        binMean = accumarray(bin(:), amplitude(:), [nBins 1], @mean, NaN);
+        if sum(isfinite(binMean)) >= 2
+            ampNull(iteration) = max(binMean) - min(binMean);
+        end
     end
 end
 end
