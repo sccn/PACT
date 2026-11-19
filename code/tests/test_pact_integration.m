@@ -41,6 +41,7 @@ end
 
 % Event-only analysis excludes all samples outside valid event windows.
 options{8}=4; % hfoPool value
+options{10}=2; % event type 'stim' (unique types sort before 'boundary')
 options{12}=100; % windowLength (ms)
 outEvent=pac_man(EEG,options{:});
 assert(isequal(outEvent.data,inputData));
