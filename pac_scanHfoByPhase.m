@@ -71,96 +71,93 @@ end
 % Prepare log-scaled frequency edges.
 phaseFreqList = logspace(log10(phaseFreqRange(1)), log10(phaseFreqRange(2)), numFreqBins);
 ampFreqList   = logspace(log10(ampFreqRange(1)),   log10(ampFreqRange(2)),   numFreqBins);
-phaseFreqTbw  = mean(diff(phaseFreqList))/2; % /2 is a heuristic solution to improve freq resolution. May need to be removed if it makes the filter too aggressive.
-ampFreqTbw    = mean(diff(ampFreqList));
+nPhase = numel(phaseFreqList)-1;
+nAmp   = numel(ampFreqList)-1;
 
-% Determine filter parametes for phase. (taken from pop_firwsord.m)
-df  = phaseFreqTbw/EEG.srate; % Normalize transition band width
-wtype = 4; % wtypes = {'rectangular' 'bartlett' 'hann' 'hamming' 'blackman' 'kaiser'};
-devs = {0.089 0.056 0.0063 0.0022 0.0002 []};
-dev = devs{wtype};
-dfs = [0.9 2.9 3.1 3.3 5.5]; 
-m = dfs(wtype) / df;
-phaseFilterOrder = ceil(m / 2) * 2;
-disp(sprintf('For phase analysis, FIR window type, Hamming, TBW, %.3f.', phaseFreqTbw))
-disp(sprintf('Band-pass filter center frequencies are shown below.'))
-phaseFreqList
+% Hamming windowed-sinc filters (firfilt). The historical transition widths
+% were one value per family (phase: half the mean bin width; amplitude: the
+% mean bin width). For log-spaced bins narrower than that width the passband
+% collapsed: the centre gain fell below 1 and pop_firws warned "Filter order
+% too low". Each band's width is now capped at pop_firws' limit, so the -6 dB
+% edges stay at the requested bin edges (see pac_firwsOrder, VALIDATION.md).
+phaseFreqTbw = mean(diff(phaseFreqList))/2;
+ampFreqTbw   = mean(diff(ampFreqList));
+phaseFilterOrder = zeros(1,nPhase);
+ampFilterOrder   = zeros(1,nAmp);
+for k = 1:nPhase
+    phaseFilterOrder(k) = pac_firwsOrder(EEG.srate,phaseFreqList(k:k+1),phaseFreqTbw);
+end
+for k = 1:nAmp
+    ampFilterOrder(k) = pac_firwsOrder(EEG.srate,ampFreqList(k:k+1),ampFreqTbw);
+end
+fprintf('Phase bands (Hz): %s\n',mat2str(round(phaseFreqList,3)));
+fprintf('Phase filter orders: %s\n',mat2str(phaseFilterOrder));
+fprintf('Amplitude bands (Hz): %s\n',mat2str(round(ampFreqList,3)));
+fprintf('Amplitude filter orders: %s\n',mat2str(ampFilterOrder));
 
-% Determine filter parametes for amp.
-df  = ampFreqTbw/EEG.srate; % Normalize transition band width
-wtype = 4; % wtypes = {'rectangular' 'bartlett' 'hann' 'hamming' 'blackman' 'kaiser'};
-devs = {0.089 0.056 0.0063 0.0022 0.0002 []};
-dev = devs{wtype};
-dfs = [0.9 2.9 3.1 3.3 5.5]; 
-m = dfs(wtype) / df;
-ampFilterOrder = ceil(m / 2) * 2;
-disp(sprintf('For Amp analysis, FIR window type, Hamming, TBW, %.3f.', ampFreqTbw))
-disp(sprintf('Band-pass filter center frequencies are shown below.'))
-ampFreqList
-
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% Remove 1-s peri-boundary data points. %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-% This is mainly for window-rejected data to avoid filter's edge effect (11/04/2020 Makoto. Added).
-guard=max(1,round(EEG.srate));
-validSamples=true(1,EEG.pnts);
-validSamples(1:min(guard,EEG.pnts))=false;
-validSamples(max(1,EEG.pnts-guard+1):EEG.pnts)=false;
-boundaryLatency=[];
-if isfield(EEG,'event') && ~isempty(EEG.event)
-    eventTypes=cell(1,numel(EEG.event));
-    for k=1:numel(EEG.event)
-        typ=EEG.event(k).type;
-        if isnumeric(typ), eventTypes{k}=num2str(typ);
-        elseif isstring(typ), eventTypes{k}=char(typ);
-        else, eventTypes{k}=typ;
-        end
-    end
-    boundaryIdx=find(strcmpi(eventTypes,'boundary'));
-    for k=boundaryIdx
-        center=round(EEG.event(k).latency);
-        validSamples(max(1,center-guard):min(EEG.pnts,center+guard))=false;
-        boundaryLatency(end+1)=center; %#ok<AGROW>
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%% Exclude filter transients at recording edges and boundaries.    %%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% The guard covers half the longest filter (its transient support) and at
+% least 1 s. Hilbert transforms are computed within boundary segments.
+workEEG = EEG;
+isBoundary = false(1,numel(EEG.event));
+for k = 1:numel(EEG.event)
+    value = EEG.event(k).type;
+    isBoundary(k) = isequal(value,-99) || ...
+        ((ischar(value) || (isstring(value) && isscalar(value))) && strcmpi(value,'boundary'));
+end
+workEEG.event = EEG.event(isBoundary);
+for k = 1:numel(workEEG.event)
+    workEEG.event(k).type = 'boundary';
+end
+starts = findboundaries(workEEG.event);
+cuts = [starts(starts>=1 & starts<=EEG.pnts) EEG.pnts+1];
+guard = max(round(EEG.srate),max([phaseFilterOrder ampFilterOrder])/2);
+validSamples = false(1,EEG.pnts);
+for s = 1:numel(cuts)-1
+    span = cuts(s):cuts(s+1)-1;
+    if numel(span) > 2*guard
+        validSamples(span(1)+guard:span(end)-guard) = true;
     end
 end
-periBoundaryIdx=find(~validSamples);
+boundaryLatency = cuts(2:end-1);
+periBoundaryIdx = find(~validSamples);
 if ~any(validSamples)
-    error('No samples remain after 1-s edge and boundary exclusion.');
+    error('PACT:ScanUnsupported',['No samples remain after excluding %.1f s filter guards ',...
+        'at recording edges and boundaries. Use wider or higher frequency bins, or longer ',...
+        'continuous data.'],guard/EEG.srate);
 end
-disp(sprintf('%.0f boundaries found. %.1f s data will be removed.', length(boundaryLatency), length(periBoundaryIdx)/EEG.srate))
-
-
+fprintf('%d boundaries found. Guard %.2f s; %.1f s of data excluded.\n',...
+    numel(boundaryLatency),guard/EEG.srate,numel(periBoundaryIdx)/EEG.srate);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Loop phase x amplitude combinations for all the channels. %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-numLoop       = (length(phaseFreqList)-1)*(length(ampFreqList)-1)*EEG.nbchan;
-counter       = 0;
-% waitbarHandle = waitbar(counter/numLoop, 'Now processing...');
-
 % HAS threshold is computed separately for each channel and band.
-resulVectLen   = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
-mAngle  = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
-modIdx  = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
-hfoAmp  = zeros(EEG.nbchan,length(phaseFreqList)-1,length(ampFreqList)-1);
-    
+resulVectLen = zeros(EEG.nbchan,nPhase,nAmp);
+mAngle       = zeros(EEG.nbchan,nPhase,nAmp);
+modIdx       = zeros(EEG.nbchan,nPhase,nAmp);
+hfoAmp       = zeros(EEG.nbchan,nPhase,nAmp);
+rayleighZ    = zeros(EEG.nbchan,nPhase,nAmp);
+
+% Amplitude envelopes do not depend on the phase band: compute them once.
+ampEnvelopes = cell(1,nAmp);
+for ampFreqIdx = 1:nAmp
+    filtered = pop_firws(workEEG, 'fcutoff', ampFreqList(ampFreqIdx:ampFreqIdx+1), 'ftype', 'bandpass', 'wtype', 'hamming', 'forder', ampFilterOrder(ampFreqIdx), 'minphase', 0);
+    ampEnvelopes{ampFreqIdx} = segmentHilbert(filtered.data,cuts,validSamples,'abs');
+end
+clear filtered
+
 EEGorig = EEG;
-for phaseFreqIdx = 1:length(phaseFreqList)-1
-    
+for phaseFreqIdx = 1:nPhase
+
     % Apply band-pass filter to extract low-freq phase.
-    EEG = pop_firws(EEGorig, 'fcutoff', [phaseFreqList(phaseFreqIdx), phaseFreqList(phaseFreqIdx+1)], 'ftype', 'bandpass', 'wtype', 'hamming', 'forder', phaseFilterOrder, 'minphase', 0);
-    analyPhase = angle(hilbert(EEG.data'))'; % hilbert() works columnwise!!! (11/23/2020)
-    analyPhase(:,periBoundaryIdx) = [];
-    
-    % Apply band-pass filter to extract high-freq amp.
-    for ampFreqIdx = 1:length(ampFreqList)-1
-        
-        EEG = pop_firws(EEGorig, 'fcutoff', [ampFreqList(ampFreqIdx), ampFreqList(ampFreqIdx+1)], 'ftype', 'bandpass', 'wtype', 'hamming', 'forder', ampFilterOrder, 'minphase', 0);
-        analyAmp  = abs(hilbert(EEG.data'))'; % hilbert() works columnwise!!! (11/23/2020)
-        analyAmp(:,periBoundaryIdx) = [];
-        
+    filtered = pop_firws(workEEG, 'fcutoff', phaseFreqList(phaseFreqIdx:phaseFreqIdx+1), 'ftype', 'bandpass', 'wtype', 'hamming', 'forder', phaseFilterOrder(phaseFreqIdx), 'minphase', 0);
+    analyPhase = segmentHilbert(filtered.data,cuts,validSamples,'angle');
+
+    for ampFreqIdx = 1:nAmp
+        analyAmp = ampEnvelopes{ampFreqIdx};
         thresholdVector = prctile(analyAmp', 100-HASnumber);
 
         for chIdx = 1:EEG.nbchan
@@ -205,8 +202,6 @@ for phaseFreqIdx = 1:length(phaseFreqList)-1
             % by repetition changes the observations; this legacy field
             % has been retired in the scientifically validated output.
 
-            counter = counter+1;
-%             waitbar(counter/numLoop, waitbarHandle);
         end
     end
 end
@@ -224,6 +219,10 @@ EEG.pacScan.phaseFreqEdges = phaseFreqList;
 EEG.pacScan.ampFreqEdges   = ampFreqList;
 EEG.pacScan.phaseFreqTbw   = phaseFreqTbw;
 EEG.pacScan.ampFreqTbw     = ampFreqTbw;
+EEG.pacScan.phaseFilterOrder = phaseFilterOrder;
+EEG.pacScan.ampFilterOrder   = ampFilterOrder;
+EEG.pacScan.guardSamples     = guard;
+EEG.pacScan.validSampleMask  = validSamples;
 EEG.pacScan.dataDimensions = {'Channels', 'Phase Freq Edges [Hz]', 'HFO Freq Edges [Hz]'};
 vectLenMax = max(EEG.pacScan.resulVectLen(:));
 miMax      = max(EEG.pacScan.lfoPhaseMi(:));
@@ -398,3 +397,21 @@ function myfigure(EEG, figCounter, phaseFreqRange, ampFreqRange, plotType)
     annotation(gcf,'textbox', [0 1 1 0], 'String',...
         {['Phase (LFO) vs. Amplitude (HFO) ' plotType ' (Page ' num2str(figCounter) ' of ' num2str(maxFigNum) ')']}, ...
           'HorizontalAlignment','center', 'FontSize',18, 'FitBoxToText','off', 'LineStyle','none');
+
+function out = segmentHilbert(data,cuts,valid,part)
+% Analytic amplitude or phase within each boundary segment; valid columns only.
+out = zeros(size(data,1),nnz(valid));
+column = 0;
+for s = 1:numel(cuts)-1
+    span = cuts(s):cuts(s+1)-1;
+    keep = valid(span);
+    if ~any(keep), continue, end
+    analytic = hilbert(double(data(:,span)).').';
+    if strcmp(part,'abs')
+        values = abs(analytic);
+    else
+        values = angle(analytic);
+    end
+    out(:,column+(1:nnz(keep))) = values(:,keep);
+    column = column+nnz(keep);
+end

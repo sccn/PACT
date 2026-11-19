@@ -49,6 +49,12 @@ if numPhaseFreqs<3 || numPhaseFreqs~=round(numPhaseFreqs) || ...
           (ampFreqRange(2)>ampFreqRange(1) && ampFreqRange(2)<EEG.srate/2))
     error('Invalid scan frequency, sample-count, or HAS range.');
 end
+% filt_fir1fft places stopband edges 20% beyond each band edge.
+if 1.2*phaseFreqRange(2) >= EEG.srate/2 || (ampFreqRange(2)~=0 && 1.2*ampFreqRange(2) >= EEG.srate/2)
+    error('PACT:ScanUnsupported',['Upper band edges must be below Nyquist/1.2 (%.1f Hz) ',...
+        'because the stopband extends 20%% beyond each band; use [low 0] for a high-pass HFO band.'],...
+        EEG.srate/2/1.2);
+end
 % The legacy FFT FIR scanner filters concatenated data as one sequence,
 % so boundary-containing recordings must be rejected rather than silently
 % treating discontinuities as neuronal transients.
@@ -61,7 +67,8 @@ if isfield(EEG,'event') && ~isempty(EEG.event)
         else, types{k}=value;
         end
     end
-    if any(strcmpi(types,'boundary'))
+    numericBoundary = any(arrayfun(@(e) isequal(e.type,-99), EEG.event));
+    if any(strcmpi(types,'boundary')) || numericBoundary
         error(['Legacy HAS-frequency scan cannot safely filter EEG with boundaries. ',...
                'Use a genuinely continuous recording or a boundary-aware method.']);
     end
@@ -77,14 +84,27 @@ hasRateList   = logspace(log10(hasRateRange(1)),   log10(hasRateRange(2)),   num
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% compute amplitudes %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
-if nnz(ampFreqRange(2)) % band-pass filter for HFO
-    filtAmp = filt_fir1fft(double(EEG.data'), ampFreqRange(1), ampFreqRange(2), EEG.srate);
-else                    % high-pass filter for HFO
-    filtAmp = filt_fir1fft(double(EEG.data'), ampFreqRange(1), 0, EEG.srate);
+% Exclude filter edge transients: half the longest FIR (Kaiser) order at each
+% end of the recording (previously no samples were excluded).
+ampHigh = 0;
+if nnz(ampFreqRange(2)), ampHigh = ampFreqRange(2); end % band-pass, else high-pass
+[~,orders] = filt_fir1fft([], ampFreqRange(1), ampHigh, EEG.srate);
+for lfoIdx = 1:length(phaseFreqList)-1
+    [~,orders(end+1)] = filt_fir1fft([], phaseFreqList(lfoIdx), phaseFreqList(lfoIdx+1), EEG.srate); %#ok<AGROW>
 end
+guard = max(orders)/2;
+validSamples = guard+1:EEG.pnts-guard;
+if numel(validSamples) < 2
+    error('PACT:ScanUnsupported',['Filters up to order %d leave no samples after excluding ',...
+        '%.1f s at each recording edge. Use higher LFO frequencies or longer data.'],...
+        max(orders),guard/EEG.srate);
+end
+fprintf('Excluding %.2f s of filter transients at each recording edge.\n',guard/EEG.srate);
+filtAmp = filt_fir1fft(double(EEG.data'), ampFreqRange(1), ampHigh, EEG.srate);
 analyAmp             = abs(hilbert(filtAmp))';
+analyAmp             = analyAmp(:,validSamples);
 [analyAmpSort,index] = sort(analyAmp, 2, 'descend');
-edges                = ceil(hasRateList/100*length(analyAmp));
+edges                = ceil(hasRateList/100*size(analyAmp,2));
 edges                = edges(end:-1:1);
 initEdgeIdx          = index(:,1:edges(1));
 
@@ -100,6 +120,7 @@ modIdx  = zeros(EEG.nbchan,length(phaseFreqList)-1,length(edges));
 for lfoIdx = 1:length(phaseFreqList)-1
     tmpLfoPhase = filt_fir1fft(double(EEG.data'), phaseFreqList(lfoIdx), phaseFreqList(lfoIdx+1), EEG.srate);
     analyPhase  = angle(hilbert(tmpLfoPhase))';
+    analyPhase  = analyPhase(:,validSamples);
     
     for numEdge    = 1:length(edges)
         tmpEdge    = edges(numEdge);
@@ -121,6 +142,11 @@ close(h)
 EEG.pacScan.lfoPhaseVect = vectL ;
 EEG.pacScan.pacAngle     = mAngle;
 EEG.pacScan.lfoPhaseMi   = modIdx;
+EEG.pacScan.phaseFreqEdges = phaseFreqList;
+EEG.pacScan.hasRates     = hasRateList;
+EEG.pacScan.filterOrders = orders;
+EEG.pacScan.guardSamples = guard;
+EEG.pacScan.dataDimensions = {'Channels','Phase Freq Edges [Hz]','HAS rate [%]'};
 vectLenMax = max(EEG.pacScan.lfoPhaseVect(:));
 miMax      = max(EEG.pacScan.lfoPhaseMi(:));
 
