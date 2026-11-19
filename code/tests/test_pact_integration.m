@@ -76,5 +76,37 @@ assert(isequal(size(outEvent.pac.windowMeanAmp),[2 101]));
 % Event windows use the same angular deviation as angleStd and legacy circ_std.
 zWin=exp(1i*angle(outEvent.pac.analyticEEG(1,outEvent.pac.winEdgesAfterRejection(:,1)+50)));
 assert(abs(outEvent.pac.windowStdPhase(1,51)-circ_std(angle(zWin(:))))<1e-12);
+
+% Regression (Nov 2026): non-sinusoidal LFO with independent HFO amplitude.
+% The block-rotation null rejected ~100% of such channels at 20% HAS.
+rng(31,'twister');
+nCh=40; n=9000; t=(0:n-1)/fs;
+null=eeg_emptyset; null.srate=fs; null.pnts=n; null.nbchan=nCh; null.trials=1;
+null.xmax=t(end);
+theta=bsxfun(@plus,2*pi*3*t,2*pi*rand(nCh,1))+cumsum(.03*randn(nCh,n),2);
+ar=filter(sqrt(1-.96^2),[1 -.96],randn(nCh,n+2000),[],2);
+null.data=cos(theta)+.6*cos(2*theta+pi/3)+.3*cos(3*theta+1)+...
+    exp(.45*ar(:,2001:end)).*cos(bsxfun(@plus,2*pi*28*t,2*pi*rand(nCh,1)))+.15*randn(nCh,n);
+evalc(['outNull=pac_man(null,''lfoPhase'',[2 10],''hfoAmp'',[20 36],',...
+    '''hfoTopRatio'',20,''numSurro'',199);']);
+assert(sum(outNull.pac.uncorrected.MIpval<=.05)<=6,...
+    'Non-sinusoidal null rejected %d of 40 channels.',sum(outNull.pac.uncorrected.MIpval<=.05));
+
+% Regression: events locked to one LFO phase with a constant HFO envelope.
+% Raw MI is large, but there is no amplitude modulation; the rotation null
+% gave p = 0.005. Block-local debiasing must not reject.
+rng(3,'twister');
+fs2=200; n2=fs2*120; t2=(0:n2-1)/fs2;
+locked=eeg_emptyset; locked.srate=fs2; locked.pnts=n2; locked.nbchan=1;
+locked.trials=1; locked.xmax=t2(end);
+theta=2*pi*4*t2+2*pi*rand;
+locked.data=cos(theta)+cos(2*pi*28*t2+2*pi*rand)+.05*randn(1,n2);
+peaks=find(diff(sign(diff(cos(theta))))<0)+1;
+peaks=peaks(peaks>2*fs2 & peaks<n2-2*fs2);
+locked.event=struct('type','stim','latency',num2cell(peaks(1:8:end)),'duration',0);
+locked.urevent=locked.event;
+evalc(['outLocked=pac_man(locked,''lfoPhase'',[3 5],''hfoAmp'',[20 36],''hfoTopRatio'',100,',...
+    '''hfoPool'',4,''whichMarker'',1,''windowLength'',40,''numSurro'',199,''numPhaseBin'',4);']);
+assert(outLocked.pac.mi>.5 && outLocked.pac.uncorrected.MIpval>.05);
 fprintf('test_pact_integration: PASS\n');
 end

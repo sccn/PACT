@@ -9,13 +9,34 @@ for HAS. In the core, FIR and Hilbert processing respect recording boundaries.
 HAS at 100% includes every eligible sample. Event mode uses the union of
 accepted event windows. MobiLab handpicked mode is unsupported.
 
-The MI test rotates independent time blocks conditional on their weighted
-resultant magnitudes. It measures cross-block phase consistency and requires
-at least four HAS-containing blocks. A phase-locked event can concentrate
-phase even with a constant HFO envelope. Interpret the test as exploratory,
-especially for event-related or nonstationary recordings. Channel-wise p-value
-correction does not account for parameter searches. Legacy distribution tests
-are disabled.
+**MI statistics (changed November 2026).** `EEG.pac.mi` keeps its historical
+definition, |mean(HFO amplitude × exp(i·LFO phase))| over HAS samples, and is
+descriptive. The p-value (`uncorrected.MIpval` and its corrections) tests the
+*block-debiased MI*, `EEG.pac.dmi`. Each uninterrupted, boundary-safe stretch of
+data is split into blocks of at least 5 cycles of the lowest LFO frequency
+(and at least 0.5 s). Within each block, the mean LFO phasor of that block's
+eligible samples is subtracted before the HAS samples are summed. The null
+distribution flips the sign of each block's contribution at random. This
+removes the phase-clustering bias that non-sinusoidal LFOs create in the raw
+MI. It also respects the temporal autocorrelation that the historical
+sample-permutation null ignored. In simulations, the historical null rejected
+4–56% of true-null channels, and the earlier block-rotation draft rejected up
+to 100% with non-sinusoidal LFOs. The revised test stayed at 1.7–5.9%
+(nominal 5%). See [VALIDATION.md](VALIDATION.md).
+
+Interpret the test as exploratory. It assumes independent, centrally symmetric
+block contributions under the null. Event-locked waveforms, broadband
+transients and dependence that spans blocks can violate this assumption. At
+least four HAS-containing blocks are required, otherwise p-values are NaN.
+Channel-wise correction does not account for searches over frequencies, HAS
+rates or conditions. The legacy phase and amplitude distribution tests are
+disabled.
+
+**Third-party code.** PACT bundles CircStat by Philipp Berens
+(P. Berens, *CircStat: A MATLAB Toolbox for Circular Statistics*, J Stat Softw
+31(10), 2009), unmodified, under its BSD license. See
+[external/README.md](external/README.md). Please cite CircStat as well when you
+use PACT's circular summaries or polar plots.
 
 ---
 What is PACT?
@@ -118,19 +139,23 @@ N% highest HFO amplitudes. Obtain the HAS index from this.
 7\. Compute the Modulation Index (Canotly et al., 2006) for the
 collection of HAS phasors constructed above.
 
-8\. Generate a collection of surrogate data by circularly permuting the
-phase time-series relative to the amplitude series.
+8\. For inference, compute the block-debiased MI (`dmi`). Within each
+boundary-safe block (at least 5 LFO cycles), subtract the block's mean LFO
+phasor before summing the HAS phasors.
 
-9\. Compute a surrogate set of Modulation Indices for which the null
-hypothesis should hold and determine a statistical threshold from their
-distribution.
+9\. Build the null distribution by randomly flipping the sign of each
+block's contribution, and compute a Monte Carlo p-value,
+(1 + exceedances) / (1 + draws). (Historical versions permuted single
+phase samples, which is invalid for autocorrelated EEG.)
 
 10\. Perform multiple comparison corrections based on the number of
 channels for which you are estimating PAC significance.
 
-Note: To compute and perform statistics on the Mean Resultant Vector
-Length, PACT uses CircStat (Berens, 2009). To compute phase-sorted
-amplitude statistics, PACT uses K-S and Chi-square tests.
+Note: PACT computes the Mean Resultant Vector Length, mean angle and
+angular deviation with CircStat (Berens, 2009; bundled in
+`external/CircStat`). The phase-sorted amplitude bars are descriptive; the
+historical K-S and Chi-square tests are disabled because HAS-selected,
+autocorrelated samples violate their assumptions.
 
 What do the PACT GUIs look like?
 --------------------------------
