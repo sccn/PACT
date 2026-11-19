@@ -42,13 +42,29 @@ else              % band-pass filter
     dev = [0.1 0.1 0.1];
     freqStr = sprintf('BPF between %2.2f-%2.2fHz', loLim, hiLim);
 end
+if ~ismatrix(input) || ~isnumeric(input) || isempty(input) || ...
+        ~isscalar(samplingRate) || ~isfinite(samplingRate) || samplingRate<=0 || ...
+        ~isscalar(loLim) || ~isscalar(hiLim) || loLim<0 || hiLim<0 || ...
+        (loLim==0 && hiLim==0)
+    error('Invalid FIR filter input or parameters.');
+end
+if any(f <= 0) || any(f >= samplingRate/2) || any(diff(f)<=0)
+    error('FIR filter transition edges must be ordered and within Nyquist.');
+end
 [n,Wn,beta,ftype] = kaiserord(f,a,dev,samplingRate);
-b = fir1(n,Wn,ftype);
-% fvtool(b)
-prefix  = input(n:-1:1,:)*-1;
-suffix  = input(end:-1:end-n+1,:)*-1;
-tmpSgnl = [prefix; input; suffix];
-tmpOut1 = fftfilt(b,tmpSgnl);
-tmpOut2 = tmpOut1(floor(n*1.5)+1:end,:); % align the beginning; +1 as a result of comparison with eegfilt
-output  = tmpOut2(1:size(input,1),:);
+% Use the Kaiser window requested by kaiserord, not fir1's Hamming default.
+% Even FIR order ensures an integral group delay.
+n = 2*ceil(n/2);
+nSamples = size(input,1);
+if n+1 >= nSamples
+    error('Filter order %d is too long for %d data samples.',n,nSamples);
+end
+b = fir1(n,Wn,ftype,kaiser(n+1,beta));
+% Boundary reflection about each endpoint, preserving its local baseline.
+prefix = 2*input(1,:) - input(n+1:-1:2,:);
+suffix = 2*input(end,:) - input(end-1:-1:end-n,:);
+padded = [prefix; input; suffix];
+filtered = fftfilt(b,padded);
+first = n+n/2+1;
+output = filtered(first:first+nSamples-1,:);
 fprintf('filt_fir1fft: %s, order %d, TBW 20%%, PB/SB ripple 0.1.\n', freqStr, n)
