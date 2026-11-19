@@ -33,6 +33,8 @@ assert(isequal(size(out.pac.analyticEEG),size(inputData)));
 assert(~out.pac.validSampleMask(3000));
 assert(all(isfinite(out.pac.mi)));
 assert(all(out.pac.uncorrected.MIpval>0));
+assert(all(isfinite(out.pac.dmi)) && all(out.pac.numBlocks>=4));
+assert(isequal(size(out.pac.dmi),[2 1]) && out.pac.blockLength==250);
 outRepeat=pac_man(EEG,options{:});
 assert(isequaln(out.pac.mi,outRepeat.pac.mi));
 assert(isequaln(out.pac.uncorrected.MIpval,outRepeat.pac.uncorrected.MIpval));
@@ -71,5 +73,8 @@ assert(isequal(outEvent.pac.winEdgesAfterRejection,[centers'-50 centers'+50]));
 assert(isequal(outEvent.pac.hfoIndex{1},find(gate)));
 assert(all(outEvent.pac.uncorrected.MIpval<=.05));
 assert(isequal(size(outEvent.pac.windowMeanAmp),[2 101]));
+% Event windows use the same angular deviation as angleStd and legacy circ_std.
+zWin=exp(1i*angle(outEvent.pac.analyticEEG(1,outEvent.pac.winEdgesAfterRejection(:,1)+50)));
+assert(abs(outEvent.pac.windowStdPhase(1,51)-circ_std(angle(zWin(:))))<1e-12);
 fprintf('test_pact_integration: PASS\n');
 end

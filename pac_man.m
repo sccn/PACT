@@ -8,17 +8,24 @@ function EEG = pac_man(EEG, varargin)
 %   * Does not modify original EEG.data or EEG.event.
 %   * Maintains sample coordinates; excluded samples remain in analyticEEG
 %     but are never selected or used to build surrogate distributions.
-%   * Independently phase-rotates long, uninterrupted time blocks (>=5 LFO
-%     cycles), retaining within-block structure. HAS amplitudes are fixed.
-%     Tests preferred phase consistency across blocks, not general PAC null.
+%   * MI (field mi) keeps its historical definition |mean(a*exp(i*phase))|
+%     over HAS samples and is descriptive.
+%   * The MI p-value tests the block-debiased MI (field dmi): within each
+%     boundary-safe block (>= 5 cycles of the lowest LFO frequency, >= 0.5 s)
+%     the block's mean candidate-sample phasor is subtracted before summing
+%     a*exp(i*phase) over HAS samples. The null randomly flips the sign of
+%     each block's contribution. See pac_blockSurrogate for assumptions.
+%     The legacy sample-permutation null was invalid for autocorrelated
+%     signals and is not used.
 %   * Uses (1 + exceedances)/(1 + iterations) for empirical p-values.
 %   * Reports adjusted channel-wise Holm and Benjamini-Hochberg p-values.
 %   * Historical phase and amp distribution tests are not inferentially
 %     valid for temporally dependent, HAS-selected samples and are disabled.
 %
 % Event-related mode (hfoPool=4) pools HAS samples only from valid event
-% windows. Its MI p-value is an exploratory block-rotation test, NOT a trial-
-% level causal or condition-effect inference.
+% windows. Its MI p-value is an exploratory block sign-flip test, NOT a
+% trial-level causal or condition-effect inference. Event-locked waveforms
+% can produce small p-values without genuine amplitude modulation.
 %
 % Copyright (C) 2012-2026 Makoto Miyakoshi. GPL-2.0-or-later.
 
@@ -71,7 +78,8 @@ workEEG.data = bsxfun(@minus,double(EEG.data),mean(double(EEG.data),2));
 isBoundary=false(1,numel(EEG.event));
 for k=1:numel(EEG.event)
     value=EEG.event(k).type;
-    isBoundary(k)=isequal(value,-99) || strcmpi(string(value),"boundary");
+    isBoundary(k)=isequal(value,-99) || ...
+        ((ischar(value) || (isstring(value) && isscalar(value))) && strcmpi(value,'boundary'));
 end
 workEEG.event=EEG.event(isBoundary);
 for k=1:numel(workEEG.event)
@@ -156,6 +164,9 @@ out.selectedSampleMask=candidateMask;
 out.analyticEEG=amp.*exp(1i*phase);
 out.hfoIndex=cell(EEG.nbchan,1);
 out.mi=nan(EEG.nbchan,1);
+out.dmi=nan(EEG.nbchan,1);
+out.numBlocks=nan(EEG.nbchan,1);
+out.blockLength=NaN;
 out.vectLength=nan(EEG.nbchan,1);
 out.vectLengthVar=nan(EEG.nbchan,1);
 out.angleMean=nan(EEG.nbchan,1);
@@ -215,11 +226,13 @@ for ch=1:EEG.nbchan
     out.histBinMax(ch)=max(counts);
 
     try
-        nullMI=pac_shiftSurrogate(phase(ch,:),selectedAmp,selectedIdx,...
-                                  validMask,g.numSurro,EEG.srate,g.lfoPhase(1));
-        out.uncorrected.MIpval(ch)=(1+sum(nullMI>=out.mi(ch)))/(g.numSurro+1);
-        out.moduInd95CI(ch)=prctile(nullMI,95);
-        out.moduInd99CI(ch)=prctile(nullMI,99);
+        [out.dmi(ch),nullStat,info]=pac_blockSurrogate(phase(ch,:),selectedAmp,...
+            selectedIdx,validMask,candidateMask,g.numSurro,EEG.srate,g.lfoPhase(1));
+        out.numBlocks(ch)=info.nBlocks;
+        out.blockLength=info.blockLength;
+        out.uncorrected.MIpval(ch)=(1+sum(nullStat>=out.dmi(ch)))/(g.numSurro+1);
+        out.moduInd95CI(ch)=prctile(nullStat,95);
+        out.moduInd99CI(ch)=prctile(nullStat,99);
     catch ME
         if strcmp(ME.identifier,'PACT:InsufficientBlocks')
             warning('PACT:InsufficientBlocks','Channel %d: %s',ch,ME.message);
@@ -257,10 +270,12 @@ out.currentPhaseTestName='descriptive';
 out.currentAmpTestName='descriptive';
 out.currentMcompName='BonfHolm';
 out.currentModIndConfInt='95%';
-out.surrogateMethod='independent phase rotations of nonoverlapping, boundary-safe blocks; within-block PAC sums fixed';
-out.inferenceNotice=['Exploratory cross-block phase consistency MI test. Phase-bin tests ',...
-    'are disabled. Event-locked phase concentration can yield small p-values ',...
-    'with a constant envelope.'];
+out.surrogateMethod=['block-debiased MI (dmi); independent random sign flips of ',...
+    'nonoverlapping, boundary-safe block contributions'];
+out.inferenceNotice=['Exploratory test of HFO amplitude-LFO phase dependence; p-values ',...
+    'refer to dmi, not mi. Assumes independent, centrally symmetric block ',...
+    'contributions under the null. Phase-bin tests are disabled. Event-locked ',...
+    'waveforms and broadband transients can yield small p-values.'];
 if g.hfoPool==4
     out.winEdgesAfterRejection=selectedWindows;
     nWin=size(selectedWindows,1);
@@ -275,7 +290,8 @@ if g.hfoPool==4
     out.windowMeanAmp=mean(winAmp,3);
     out.windowStdAmp=std(winAmp,0,3);
     out.windowMeanPhase=angle(mean(exp(1i*winPhase),3));
-    out.windowStdPhase=sqrt(-2*log(max(abs(mean(exp(1i*winPhase),3)),eps)));
+    % Angular deviation sqrt(2(1-R)), as CircStat's circ_std and angleStd.
+    out.windowStdPhase=sqrt(2*max(0,1-abs(mean(exp(1i*winPhase),3))));
 end
 EEG.pac=out;
 end

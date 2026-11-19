@@ -38,8 +38,16 @@ set(gcf,'Color', [0.93 0.96 1]);
 
 colorScale = jet(360);
 numChan = EEG.nbchan;
+% Plot the statistic that the p-values and null percentiles refer to.
+if isfield(EEG.pac,'dmi')
+    stat = EEG.pac.dmi;
+    statLabel = 'Block-debiased MI';
+else
+    stat = EEG.pac.mi;
+    statLabel = 'Modulation Index';
+end
 for n = 1:numChan
-    tmp1 = EEG.pac.mi;
+    tmp1 = stat;
     mask = setdiff(1:numChan,n);
     tmp2 = tmp1;
     tmp2(mask) = 0;
@@ -74,11 +82,11 @@ hold off
 %%% overplot signficance %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%
 hold on
-validMi = EEG.pac.mi(isfinite(EEG.pac.mi));
+validMi = stat(isfinite(stat));
 if isempty(validMi), validMi = 1; end
 offset = max(validMi)*3/100;
 sigChan = find(EEG.pac.currentMIpval < EEG.pac.alpha);
-plot(sigChan, EEG.pac.mi(sigChan,1)+offset, 'LineStyle','none', 'Marker', '*', 'MarkerSize', 6, 'Color', 'r')
+plot(sigChan, stat(sigChan)+offset, 'LineStyle','none', 'Marker', '*', 'MarkerSize', 6, 'Color', 'r')
 hold off
 
 set(get(gca, 'XLabel'), 'String', 'Channels', 'FontSize', 10)
@@ -95,7 +103,7 @@ hold on
 [ax,h3,h4] = plotyy(1:EEG.nbchan, zeros(1,EEG.nbchan), 1:EEG.nbchan, EEG.pac.vectLength);
 set(h3, 'Color', [1 1 1], 'LineStyle', 'none')
 set(ax(1), 'YTick', 5:5:100, 'YColor', 'k', 'Box', 'off')
-set(get(gca, 'YLabel'), 'String', 'MI / surrogate null percentile', 'FontSize', 10)
+set(get(gca, 'YLabel'), 'String', [statLabel ' / null percentile'], 'FontSize', 10)
 xlim(ax(1), [0 EEG.nbchan+1])
 ylim(ax(1), [0 max(max(validMi)*1.1,eps)])
 
@@ -108,7 +116,7 @@ if isempty(validR), validR = 1; end
 ylim(ax(2), [0 max(max(validR)*1.1,eps)])
 
 annotation(gcf,'textbox', [0 1 1 0],...
-    'String',{'Modulation Index (bar; red star, significant; black bars, surrogate null percentiles), Mean Angle (color-coded), and Resultant Vector Length (line).'},...
+    'String',{[statLabel ' (bar; red star, significant; black bars, surrogate null percentiles), Mean Angle (color-coded), and Resultant Vector Length (line).']},...
     'HorizontalAlignment','center', 'FontSize', 10, 'FitBoxToText','off', 'LineStyle','none', 'FontName','Arial');
 
 % display explanations in the figure name
