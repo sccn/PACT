@@ -39,10 +39,13 @@ userInput = inputgui('title', 'pac_pop_scanLfoPhaseFreq', 'geom', ...
     {'style' 'text' 'string' 'Plot Modulation Index or mean vector length'} {'style' 'popupmenu' 'string' 'mean vector length|Modulation Index' 'value' 1}...
     {'style' 'text' 'string' 'Normalize color schema across channels'}      {'style' 'checkbox' 'value' 1}});
 
-phaseFreqRange = str2num(userInput{1,1});
-ampFreqRange   = str2num(userInput{1,2});
-HASnumber      = str2num(userInput{1,3});
-numFreqBins    = str2num(userInput{1,4});
+if isempty(userInput)
+    return
+end
+phaseFreqRange = pac_parseNumeric(userInput{1,1});
+ampFreqRange   = pac_parseNumeric(userInput{1,2});
+HASnumber      = pac_parseNumeric(userInput{1,3});
+numFreqBins    = pac_parseNumeric(userInput{1,4});
 plotType       = userInput{1,5};
 normalizeColor = userInput{1,6};
 

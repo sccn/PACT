@@ -1,3 +1,110 @@
+# PACT 1.0.0 — release candidate
+
+**Version chosen 19 November 2026.** The EEGLAB entrypoint `eegplugin_pac.m`
+now reports `PACT1.0.0`. This is a development-branch release candidate;
+it is **not yet a GitHub release** and is **not merged into `master`**.
+
+## Changes since PACT 0.70
+
+- Continuous EEG: retain the historical Canolty-type `EEG.pac.mi` as a
+  descriptive statistic, and use block-debiased `EEG.pac.dmi` with a
+  block sign-flip null for exploratory inference.
+- Event-related EEG: use a trial-shuffle null for the event-window MI,
+  not the continuous-mode block sign-flip null.
+- Correct sample selection, boundary handling, 100% highest-amplitude
+  sampling, multiple-comparison adjustments, and EEG input immutability.
+- Repair the FIR frequency scans, filter transient exclusion, and associated
+  visualization and GUI paths.
+- Include independent MATLAB regression tests, scientific simulations, and
+  [the validation report](VALIDATION.md).
+
+## Interpretation and compatibility
+
+**The new p-values are not interchangeable with PACT 0.70 p-values.**
+Continuous-mode p-values refer to `dmi`; event-mode p-values refer to
+`mi`. Frequency-scan maps may also differ materially because filter
+defects were corrected. Historical descriptive `mi` itself is retained
+for compatibility.
+
+These tests identify statistical dependence under their stated null
+assumptions, **not physiological evidence of PAC by themselves**.
+Non-sinusoidal waveforms, broadband transients and common inputs can
+create significant results. Multiplicity adjustments cover channels
+only, not searches over frequency bands, HAS rates or conditions.
+The independent holdout simulations found a small, still unexplained
+liberal Type I error excess (approximately 5.4–5.7% at nominal 5%)
+in some configurations.
+
+The scientific validation was run with MATLAB R2024b Update 3,
+EEGLAB 2024.0, and FIRfilt 2.8. Its validated code baseline was
+`c9f067716b3b19e137765633c2ec97f3286bc3d4`; the subsequent
+version/README-only commits have not been independently executed in
+MATLAB. See `VALIDATION.md` for the detailed simulation grid and
+limitations.
+
+---
+
+## Scientific-safety refactor
+
+The development branch has been exercised locally in MATLAB R2024b and EEGLAB
+2024.0. See [local validation](VALIDATION.md) for the test commands, simulation
+results, output dimensions, historical comparison and limitations.
+
+`pac_man` preserves the original EEG and uses one-based recording coordinates
+for HAS. In the core, FIR and Hilbert processing respect recording boundaries.
+HAS at 100% includes every eligible sample. Event mode uses the union of
+accepted event windows. MobiLab handpicked mode is unsupported.
+
+**MI statistics (changed November 2026).** `EEG.pac.mi` keeps its historical
+definition, |mean(HFO amplitude × exp(i·LFO phase))| over HAS samples, and is
+descriptive. `EEG.pac.testedStatistic` names the statistic that the p-values
+(`uncorrected.MIpval` and its corrections) and the null percentiles
+(`moduInd95CI`, `moduInd99CI`; historical names, not confidence intervals)
+refer to:
+
+* **Continuous modes** (`hfoPool` 1 and 2) test the *block-debiased MI*,
+  `EEG.pac.dmi`. Boundary-safe stretches of data are split into blocks of
+  `blockCycles` (default 5) cycles of the lowest LFO frequency, and at least
+  0.5 s. In each block, the mean LFO phasor of that block's eligible
+  (candidate) samples is subtracted before the HAS samples are summed. The
+  null flips the sign of each block's contribution. It is exact when at most
+  16 blocks are occupied, where p cannot fall below 2^(1−K) (see
+  `minAttainableP`), and Monte Carlo otherwise. The null tests *statistical
+  dependence* between HFO amplitude and LFO phase. It assumes independent,
+  centrally symmetric block contributions.
+* **Event mode** (`hfoPool` 4) tests `mi` against a *trial-shuffle* null.
+  Each event window's amplitudes are paired with another window's phases at
+  the same latencies. This detects event-to-event covariation of amplitude
+  with phase. Responses that are identical at every event (evoked waveforms,
+  phase concentration with an unmodulated envelope) are not reported as
+  coupling. Windows must not overlap, and at least four events are required.
+
+In simulations (see [VALIDATION.md](VALIDATION.md)), the historical
+sample-permutation null rejected 4–56% of channels without coupling. The
+earlier block-rotation draft rejected up to 100% with non-sinusoidal LFOs.
+The current tests stay near the nominal 5%.
+
+Interpret all p-values as exploratory. Sharp non-sinusoidal waveforms,
+broadband transients and common inputs create genuine statistical dependence
+that is not evidence of physiological PAC. Channel-wise correction does not
+account for searches over frequencies, HAS rates or conditions. The legacy
+phase and amplitude distribution tests are disabled.
+
+**Frequency scans.** Both scans exclude filter transients at recording edges
+and boundaries (half the longest filter). They reject configurations whose
+filters leave no valid data. The HFO-by-phase scan keeps every band's
+transition inside the band. The HAS-by-LFO scan uses a verified 40 dB Kaiser
+design. Its −6 dB bands extend about 10% beyond each requested edge, so
+adjacent rows overlap. Scan values therefore differ from versions before
+November 2026.
+
+**Third-party code.** PACT bundles CircStat by Philipp Berens
+(P. Berens, *CircStat: A MATLAB Toolbox for Circular Statistics*, J Stat Softw
+31(10), 2009), unmodified, under its BSD license. See
+[external/README.md](external/README.md). Please cite CircStat as well when you
+use PACT's circular summaries or polar plots.
+
+---
 What is PACT?
 -------------
 
@@ -98,19 +205,23 @@ N% highest HFO amplitudes. Obtain the HAS index from this.
 7\. Compute the Modulation Index (Canotly et al., 2006) for the
 collection of HAS phasors constructed above.
 
-8\. Generate a collection of surrogate data by circularly permuting the
-phase time-series relative to the amplitude series.
+8\. For inference, compute the block-debiased MI (`dmi`). Within each
+boundary-safe block (at least 5 LFO cycles), subtract the block's mean LFO
+phasor before summing the HAS phasors.
 
-9\. Compute a surrogate set of Modulation Indices for which the null
-hypothesis should hold and determine a statistical threshold from their
-distribution.
+9\. Build the null distribution by randomly flipping the sign of each
+block's contribution, and compute a Monte Carlo p-value,
+(1 + exceedances) / (1 + draws). (Historical versions permuted single
+phase samples, which is invalid for autocorrelated EEG.)
 
 10\. Perform multiple comparison corrections based on the number of
 channels for which you are estimating PAC significance.
 
-Note: To compute and perform statistics on the Mean Resultant Vector
-Length, PACT uses CircStat (Berens, 2009). To compute phase-sorted
-amplitude statistics, PACT uses K-S and Chi-square tests.
+Note: PACT computes the Mean Resultant Vector Length, mean angle and
+angular deviation with CircStat (Berens, 2009; bundled in
+`external/CircStat`). The phase-sorted amplitude bars are descriptive; the
+historical K-S and Chi-square tests are disabled because HAS-selected,
+autocorrelated samples violate their assumptions.
 
 What do the PACT GUIs look like?
 --------------------------------

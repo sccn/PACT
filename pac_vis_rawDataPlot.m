@@ -34,34 +34,23 @@ function pac_vis_rawDataPlot(EEG)
 userInput = inputgui('title', 'pac_vis_rawDataPlot()', 'geom', ...
    {{2 1 [0 0] [1 1]}   {2 1 [1 0] [1 1]}}, ... 
 'uilist',...
-   {{'style' 'text' 'string' 'Apply HFO filter?'} {'style' 'popupmenu' 'string' 'No|Yes' 'tag' 'filter' 'value' 1}});
+   {{'style' 'text' 'string' 'Display signal'} {'style' 'popupmenu' 'string' 'Raw EEG|HFO envelope' 'tag' 'filter' 'value' 1}});
 
-if userInput{1,1} == 2
-    EEG.data = abs(EEG.pac.analyticEEG);
+if isempty(userInput), return; end
+if ~isfield(EEG,'pac') || ~isfield(EEG.pac,'hfoIndex')
+    error('Compute PACT before plotting HAS samples.');
 end
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%% create an initial event %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-if isempty(EEG.event)
-    EEG.event.type       = 'start';
-    EEG.event.latency    = 1;
-    EEG.event.init_index = 1;
-    EEG.event.init_time  = 1/EEG.srate;
-
-    EEG.urevent.type       = 'start';
-    EEG.urevent.latency    = 1;
-    EEG.urevent.init_index = 1;
-    EEG.urevent.init_time  = 1/EEG.srate;
+if userInput{1,1} == 2
+    EEG.data = abs(EEG.pac.analyticEEG); % show envelope, not filtered raw oscillation
 end
 
 %%%%%%%%%%%%%%%%%%%%%%
 %%% create redMask %%%
 %%%%%%%%%%%%%%%%%%%%%%
-redMask = EEG.data;
+redMask = nan(size(EEG.data));
 for n = 1:EEG.nbchan
-    nanMask = setdiff(1:length(EEG.data), EEG.pac.hfoIndex{n,1});
-    redMask(n,nanMask) = NaN;
+    indices = EEG.pac.hfoIndex{n};
+    redMask(n,indices) = EEG.data(n,indices);
 end
 
 %%%%%%%%%%%%

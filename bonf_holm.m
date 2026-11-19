@@ -109,7 +109,7 @@ end
 m=length(sorted_p); %number of tests
 mult_fac=m:-1:1;
 cor_p_sorted=sorted_p.*mult_fac;
-cor_p_sorted(2:m)=max([cor_p_sorted(1:m-1); cor_p_sorted(2:m)]); %Bonferroni-Holm adjusted p-value
+cor_p_sorted=min(1,cummax(cor_p_sorted)); % Correct step-down cumulative maximum
 corrected_p=cor_p_sorted(unsort_ids);
 corrected_p=reshape(corrected_p,s);
 h=corrected_p<alpha;
