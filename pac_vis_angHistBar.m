@@ -75,12 +75,9 @@ for n = 1:EEG.nbchan
     set(h, 'FaceColor', [16/255 67/255 100/255]); % Marine Blue
     hold on;
 
-    % overplot a cosine wave
-    t = 0:0.01:2*pi;
-    plot(t, (cos(t)+1)/4*max(EEG.pac.histBinMax), 'r', 'LineWidth',2)
     set(gca, 'XTickLabel',{'0','pi','2*pi'},'XTick',[0 3.1415 6.2832], 'CLim',[1 2])
     xlim([0 2*pi+0.01])
-    ylim([0 max(EEG.pac.histBinMax)*1.01])
+    ylim([0 max(1,max(EEG.pac.histBinMax))*1.05])
     xlabel('phase')
     ylabel(['probability*' num2str(length(phasetmp))])
     
